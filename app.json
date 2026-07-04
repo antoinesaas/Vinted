@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Stock.01",
+    "slug": "stock01",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "stock01",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stock01.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Stock.01 accède à vos photos pour ajouter l'image d'un article.",
+        "NSCameraUsageDescription": "Stock.01 utilise l'appareil photo pour photographier un article."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autoriser Stock.01 à accéder à vos photos.",
+          "cameraPermission": "Autoriser Stock.01 à utiliser l'appareil photo."
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "tsconfigPaths": true
+    }
+  }
+}

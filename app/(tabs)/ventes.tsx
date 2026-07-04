@@ -1,0 +1,128 @@
+// ÉCRAN 5 — HISTORIQUE DES VENTES : liste chronologique + total + export CSV.
+import { Ionicons } from "@expo/vector-icons";
+import React, { useMemo, useState } from "react";
+import { Alert, FlatList, Text, View } from "react-native";
+
+import { Button } from "../../components/Button";
+import { Card } from "../../components/Card";
+import { EmptyState } from "../../components/EmptyState";
+import { Header } from "../../components/Header";
+import { Screen } from "../../components/Screen";
+import { TYPE_LABELS } from "../../constants/labels";
+import { colors } from "../../constants/theme";
+import { useStore } from "../../context/StoreContext";
+import { netMargin } from "../../utils/calculations";
+import { exportSalesCsv } from "../../utils/csv";
+import { formatEUR, formatShortDate } from "../../utils/format";
+import { soldArticles, totalLifetimeProfit } from "../../utils/stats";
+
+export default function VentesScreen() {
+  const { articles } = useStore();
+  const [exporting, setExporting] = useState(false);
+
+  // Ventes triées de la plus récente à la plus ancienne.
+  const sales = useMemo(
+    () =>
+      soldArticles(articles).sort(
+        (a, b) =>
+          new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime(),
+      ),
+    [articles],
+  );
+
+  const lifetimeProfit = useMemo(
+    () => totalLifetimeProfit(articles),
+    [articles],
+  );
+
+  // Export CSV via la feuille de partage iOS.
+  const handleExport = async () => {
+    if (sales.length === 0) return;
+    try {
+      setExporting(true);
+      const ok = await exportSalesCsv(sales);
+      if (!ok) {
+        Alert.alert("Partage indisponible", "Le partage n'est pas disponible sur cet appareil.");
+      }
+    } catch {
+      Alert.alert("Erreur", "L'export CSV a échoué.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Header
+        title="Ventes"
+        subtitle={`${sales.length} vente${sales.length > 1 ? "s" : ""} au total`}
+      />
+
+      <FlatList
+        data={sales}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: 40,
+          flexGrow: 1,
+        }}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View className="mb-3">
+            {/* Total cumulé depuis le début de l'activité. */}
+            <Card className="mb-3">
+              <Text className="text-sm font-medium uppercase tracking-wide text-muted">
+                Bénéfice cumulé (depuis le début)
+              </Text>
+              <Text className="mt-1 text-4xl font-bold text-ink">
+                {formatEUR(lifetimeProfit)}
+              </Text>
+            </Card>
+
+            {sales.length > 0 ? (
+              <Button
+                title={exporting ? "Export…" : "Exporter en CSV"}
+                icon="download-outline"
+                variant="secondary"
+                loading={exporting}
+                onPress={handleExport}
+              />
+            ) : null}
+          </View>
+        }
+        renderItem={({ item }) => {
+          const margin = netMargin(item.purchasePrice, item.soldPrice ?? 0);
+          return (
+            <View className="flex-row items-center border-b border-line py-3">
+              <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-surface">
+                <Ionicons name="cash-outline" size={20} color={colors.text} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-semibold text-ink" numberOfLines={1}>
+                  {item.name || `${item.brand} ${TYPE_LABELS[item.type]}`}
+                </Text>
+                <Text className="text-sm text-muted">
+                  {item.soldAt ? formatShortDate(item.soldAt) : ""} ·{" "}
+                  {formatEUR(item.soldPrice ?? 0)}
+                </Text>
+              </View>
+              <View className="items-end">
+                <Text className="text-base font-bold text-ink">
+                  {formatEUR(margin)}
+                </Text>
+                <Text className="text-xs text-muted">marge nette</Text>
+              </View>
+            </View>
+          );
+        }}
+        ListEmptyComponent={
+          <EmptyState
+            icon="cash-outline"
+            title="Aucune vente"
+            subtitle="Marque un article comme vendu depuis le stock (swipe vers la gauche)."
+          />
+        }
+      />
+    </Screen>
+  );
+}
