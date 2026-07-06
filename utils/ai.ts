@@ -94,3 +94,37 @@ export async function parseScreenshot(
     mimeType,
   });
 }
+
+/** Résultat de l'estimation du prix de revente réel. */
+export interface ResalePriceResult {
+  averagePrice: number | null;
+  medianPrice: number | null;
+  lowPrice: number | null;
+  highPrice: number | null;
+  /** Nombre d'annonces comparables utilisées (0 si estimation IA de repli). */
+  sampleSize: number;
+  currency: string;
+  /** "vinted_search" = moyenne d'annonces réelles ; "ai_estimate" = repli IA. */
+  source: "vinted_search" | "ai_estimate";
+  note: string;
+}
+
+/**
+ * Recherche le prix de revente réel d'un produit à partir d'annonces
+ * comparables actuellement en ligne sur Vinted (avec repli sur une
+ * estimation IA si la recherche échoue).
+ */
+export async function estimateResalePrice(
+  brand: string,
+  type: ArticleType,
+  size: string,
+  condition: ArticleCondition,
+): Promise<ResalePriceResult> {
+  return callFunction<ResalePriceResult>({
+    action: "estimate_resale_price",
+    brand,
+    type,
+    size,
+    condition,
+  });
+}

@@ -1,5 +1,5 @@
-// Indicateur visuel de marge (seule touche de couleur de l'app).
-// Vert > 50 %, orange 30-50 %, rouge < 30 %.
+// Indicateur visuel de deal (seule touche de couleur de l'app).
+// Vert = bon deal, orange = minimum acceptable, rouge = insuffisant.
 import React from "react";
 import { Text, View } from "react-native";
 import { colors } from "../constants/theme";
@@ -7,18 +7,27 @@ import type { MarginLevel } from "../utils/calculations";
 
 interface MarginIndicatorProps {
   level: MarginLevel;
-  /** Libellé affiché (ex : "64 %"). */
+  /** Libellé affiché (ex : "64 %" ou "x2,3"). */
   label: string;
+  /** Titre qualitatif (par défaut selon le niveau, personnalisable). */
+  title?: string;
 }
 
-const CONFIG: Record<MarginLevel, { color: string; text: string }> = {
-  high: { color: colors.success, text: "Excellente marge" },
-  medium: { color: colors.warning, text: "Marge correcte" },
-  low: { color: colors.danger, text: "Marge faible" },
+const DEFAULT_TITLES: Record<MarginLevel, string> = {
+  high: "Excellent",
+  medium: "Acceptable",
+  low: "Insuffisant",
 };
 
-export function MarginIndicator({ level, label }: MarginIndicatorProps) {
-  const { color, text } = CONFIG[level];
+const COLORS: Record<MarginLevel, string> = {
+  high: colors.success,
+  medium: colors.warning,
+  low: colors.danger,
+};
+
+export function MarginIndicator({ level, label, title }: MarginIndicatorProps) {
+  const color = COLORS[level];
+  const text = title ?? DEFAULT_TITLES[level];
   return (
     <View
       className="flex-row items-center justify-between rounded-2xl px-4 py-3"

@@ -4,7 +4,7 @@
 
 import {
   DEFAULT_PRICE_MULTIPLIER,
-  MARGIN_THRESHOLDS,
+  RESALE_MULTIPLIER_THRESHOLDS,
   SACHET_FEE,
 } from "../constants/config";
 
@@ -39,13 +39,30 @@ export function recommendedPrice(
 }
 
 /**
- * Classe une marge selon les seuils métier :
- * - > 50 %  -> "high"   (vert)
- * - 30-50 % -> "medium" (orange)
- * - < 30 %  -> "low"    (rouge)
+ * Multiplicateur du prix d'achat : prix de vente ÷ prix d'achat.
+ * Retourne 0 si le prix d'achat est nul (évite une division par zéro).
  */
-export function marginLevel(percent: number): MarginLevel {
-  if (percent > MARGIN_THRESHOLDS.high) return "high";
-  if (percent >= MARGIN_THRESHOLDS.medium) return "medium";
+export function resaleMultiplier(purchase: number, sell: number): number {
+  if (purchase <= 0) return 0;
+  return sell / purchase;
+}
+
+/**
+ * Classe un deal selon le multiplicateur du prix d'achat :
+ * - >= x2   -> "high"   (vert)   — cible x2 à x2,5
+ * - x1,5-x2 -> "medium" (orange) — minimum acceptable
+ * - < x1,5  -> "low"    (rouge)  — deal insuffisant
+ */
+export function multiplierLevel(multiplier: number): MarginLevel {
+  if (multiplier >= RESALE_MULTIPLIER_THRESHOLDS.target) return "high";
+  if (multiplier >= RESALE_MULTIPLIER_THRESHOLDS.min) return "medium";
   return "low";
+}
+
+/** Libellé qualitatif du deal selon le multiplicateur du prix d'achat. */
+export function multiplierLabel(multiplier: number): string {
+  if (multiplier >= RESALE_MULTIPLIER_THRESHOLDS.excellent) return "Excellent deal";
+  if (multiplier >= RESALE_MULTIPLIER_THRESHOLDS.target) return "Bon deal";
+  if (multiplier >= RESALE_MULTIPLIER_THRESHOLDS.min) return "Minimum acceptable";
+  return "Deal insuffisant";
 }

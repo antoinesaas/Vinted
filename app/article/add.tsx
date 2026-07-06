@@ -64,8 +64,8 @@ export default function AddArticleScreen() {
       : "tres_bon";
   const initialPurchase = params.purchasePrice ?? "";
 
-  // Vrai si l'écran est ouvert depuis l'analyse d'une capture d'écran.
-  const fromScreenshot = !!(params.purchasePrice || params.photoUri);
+  // Vrai si l'écran est ouvert depuis le calculateur (prix pré-rempli).
+  const fromCalculator = !!(params.purchasePrice || params.photoUri);
 
   // Champs du formulaire (pré-remplis si des paramètres sont fournis).
   const [photoUri, setPhotoUri] = useState<string | null>(
@@ -273,10 +273,10 @@ export default function AddArticleScreen() {
               onChangeText={handlePurchaseChange}
               suffix="€"
             />
-            {fromScreenshot ? (
+            {fromCalculator ? (
               <Text className="mt-2 text-xs text-muted">
-                ✓ Prix détecté sur la capture. Confirme le coût d'achat réellement
-                payé pour des statistiques justes.
+                ✓ Prix pré-rempli depuis le calculateur. Confirme le coût
+                d'achat réellement payé pour des statistiques justes.
               </Text>
             ) : null}
             <Input

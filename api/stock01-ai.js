@@ -1,5 +1,6 @@
 // ============================================================
-// Fonction serverless Vercel : proxy sécurisé vers OpenAI.
+// Fonction serverless Vercel : proxy sécurisé vers OpenAI + recherche
+// de prix de revente réels sur Vinted.
 // La clé OPENAI_API_KEY reste dans les variables d'environnement
 // Vercel (côté serveur), jamais dans l'app mobile.
 //
@@ -7,6 +8,9 @@
 //   { action: "generate_description", article: {...} }  -> { description }
 //   { action: "parse_screenshot", imageBase64, mimeType }
 //       -> { title, brand, size, condition, type, price, currency }
+//   { action: "estimate_resale_price", brand, type, size, condition }
+//       -> { averagePrice, medianPrice, lowPrice, highPrice, sampleSize,
+//            currency, source: "vinted_search" | "ai_estimate", note }
 //
 // Aucune dépendance : utilise fetch natif de Node 18+.
 // ============================================================
@@ -15,6 +19,10 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 // Secret partagé optionnel : si défini, l'app doit envoyer l'en-tête x-app-key.
 const APP_SHARED_SECRET = process.env.APP_SHARED_SECRET || "";
+
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 /** Appel OpenAI Chat Completions (mode JSON strict). `content` peut être
  *  une chaîne ou un tableau multimodal (texte + image) pour la vision. */
@@ -134,6 +142,191 @@ async function parseScreenshot(imageBase64, mimeType) {
   };
 }
 
+// ---- Action 3 : recherche du prix de revente réel sur Vinted ----
+
+const TYPE_WORDS = { tshirt: "t-shirt", short: "short", veste: "veste", autre: "" };
+
+// Statuts Vinted (texte affiché) correspondant à chacun de nos états.
+const CONDITION_MATCH = {
+  bon: ["bon état", "satisfaisant"],
+  tres_bon: ["très bon état"],
+  parfait: ["neuf avec étiquette", "neuf sans étiquette"],
+};
+
+/** fetch avec timeout, pour ne pas dépasser la limite d'exécution serverless. */
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Construit un en-tête Cookie à partir des Set-Cookie d'une réponse. */
+function cookieHeaderFromResponse(res) {
+  const raw =
+    typeof res.headers.getSetCookie === "function"
+      ? res.headers.getSetCookie()
+      : [res.headers.get("set-cookie")].filter(Boolean);
+  return raw.map((c) => c.split(";")[0]).join("; ");
+}
+
+/** Ouvre une session anonyme Vinted (cookies) nécessaire pour interroger l'API. */
+async function openVintedSession() {
+  const res = await fetchWithTimeout(
+    "https://www.vinted.fr/",
+    {
+      headers: {
+        "User-Agent": BROWSER_USER_AGENT,
+        "Accept-Language": "fr-FR,fr;q=0.9",
+      },
+    },
+    8000,
+  );
+  if (!res.ok) {
+    throw new Error(`Session Vinted indisponible (${res.status}).`);
+  }
+  return cookieHeaderFromResponse(res);
+}
+
+/** Recherche des annonces comparables sur Vinted et renvoie leurs prix (EUR). */
+async function searchVintedListings(cookie, query) {
+  const url = `https://www.vinted.fr/api/v2/catalog/items?search_text=${encodeURIComponent(query)}&per_page=40&order=relevance`;
+  const res = await fetchWithTimeout(
+    url,
+    {
+      headers: {
+        "User-Agent": BROWSER_USER_AGENT,
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+        Referer: `https://www.vinted.fr/catalog?search_text=${encodeURIComponent(query)}`,
+        Origin: "https://www.vinted.fr",
+        "X-Requested-With": "XMLHttpRequest",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Dest": "empty",
+        Cookie: cookie,
+      },
+    },
+    8000,
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Recherche Vinted indisponible (${res.status}). ${body.slice(0, 200)}`,
+    );
+  }
+  const data = await res.json();
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+/** Estimation de repli par l'IA (utilisée si la recherche Vinted échoue). */
+async function aiFallbackEstimate(brand, typeWord, size, condition) {
+  const system =
+    "Tu es un expert de la revente de vêtements d'occasion sur Vinted. " +
+    "Tu estimes un prix de revente réaliste. Tu réponds STRICTEMENT en JSON.";
+  const user =
+    `Estime le prix de revente réaliste (en euros, marché français) pour : ` +
+    `${brand} ${typeWord} taille ${size}, état ${condition}. ` +
+    'Réponds en JSON avec une seule clé "price" (nombre, prix moyen réaliste).';
+
+  const result = await callOpenAI(
+    [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    0.3,
+  );
+  const price = typeof result.price === "number" ? result.price : null;
+  return {
+    averagePrice: price,
+    medianPrice: price,
+    lowPrice: price,
+    highPrice: price,
+    sampleSize: 0,
+    currency: "EUR",
+    source: "ai_estimate",
+    note: "Recherche Vinted indisponible : estimation IA approximative, sans annonces comparables réelles.",
+  };
+}
+
+async function estimateResalePrice({ brand, type, size, condition }) {
+  const typeWord = TYPE_WORDS[type] || "";
+  const query = [brand, typeWord].filter(Boolean).join(" ").trim();
+  if (!query) {
+    return { _status: 400, error: "Marque ou type manquant pour la recherche." };
+  }
+
+  try {
+    const cookie = await openVintedSession();
+    const items = await searchVintedListings(cookie, query);
+
+    // Ne garde que des prix numériques valides.
+    const priced = items
+      .map((it) => ({
+        price: Number.parseFloat(it?.price?.amount),
+        sizeTitle: String(it?.size_title || "").toLowerCase(),
+        status: String(it?.status || "").toLowerCase(),
+      }))
+      .filter((it) => Number.isFinite(it.price) && it.price > 0);
+
+    if (priced.length === 0) {
+      const fallback = await aiFallbackEstimate(brand, typeWord, size, condition);
+      return fallback;
+    }
+
+    // Filtrage souple par taille puis par état, seulement si l'échantillon
+    // filtré reste assez grand pour être représentatif.
+    let sample = priced;
+    if (size) {
+      const sizeLower = size.toLowerCase();
+      const bySize = priced.filter((it) =>
+        it.sizeTitle
+          .split("/")
+          .map((s) => s.trim())
+          .some((s) => s === sizeLower || s.includes(sizeLower)),
+      );
+      if (bySize.length >= 3) sample = bySize;
+    }
+    if (condition && CONDITION_MATCH[condition]) {
+      const wanted = CONDITION_MATCH[condition];
+      const byCondition = sample.filter((it) =>
+        wanted.some((w) => it.status.includes(w)),
+      );
+      if (byCondition.length >= 3) sample = byCondition;
+    }
+
+    const prices = sample.map((it) => it.price);
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+
+    return {
+      averagePrice: Math.round(avg * 100) / 100,
+      medianPrice: Math.round(median(prices) * 100) / 100,
+      lowPrice: Math.round(Math.min(...prices) * 100) / 100,
+      highPrice: Math.round(Math.max(...prices) * 100) / 100,
+      sampleSize: prices.length,
+      currency: "EUR",
+      source: "vinted_search",
+      note: `Basé sur ${prices.length} annonce(s) comparable(s) actuellement en ligne sur Vinted.`,
+    };
+  } catch (err) {
+    // Vinted a bloqué/échoué (anti-bot, indisponibilité...) : repli IA.
+    const fallback = await aiFallbackEstimate(brand, typeWord, size, condition);
+    fallback.note = `${(err && err.message) || "Recherche Vinted indisponible"} — ${fallback.note}`;
+    return fallback;
+  }
+}
+
 /** Lit et parse le corps JSON de la requête. */
 async function readJson(req) {
   if (req.body !== undefined && req.body !== null) {
@@ -188,6 +381,18 @@ module.exports = async (req, res) => {
     }
     if (payload.action === "parse_screenshot") {
       const result = await parseScreenshot(payload.imageBase64, payload.mimeType);
+      const status = result._status || 200;
+      delete result._status;
+      res.status(status).json(result);
+      return;
+    }
+    if (payload.action === "estimate_resale_price") {
+      const result = await estimateResalePrice({
+        brand: payload.brand || "",
+        type: payload.type || "autre",
+        size: payload.size || "",
+        condition: payload.condition || "tres_bon",
+      });
       const status = result._status || 200;
       delete result._status;
       res.status(status).json(result);
