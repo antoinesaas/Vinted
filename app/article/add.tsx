@@ -4,7 +4,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -26,6 +25,7 @@ import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleCondition, ArticleType } from "../../types";
+import { notify } from "../../utils/alert";
 import { netMargin, recommendedPrice } from "../../utils/calculations";
 import { formatEUR, parseAmount } from "../../utils/format";
 
@@ -112,7 +112,7 @@ export default function AddArticleScreen() {
   const pickFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Permission refusée", "Autorise l'accès aux photos pour ajouter une image.");
+      notify("Permission refusée", "Autorise l'accès aux photos pour ajouter une image.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -130,7 +130,7 @@ export default function AddArticleScreen() {
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Permission refusée", "Autorise l'accès à l'appareil photo.");
+      notify("Permission refusée", "Autorise l'accès à l'appareil photo.");
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -146,11 +146,11 @@ export default function AddArticleScreen() {
   // Validation puis enregistrement.
   const handleSave = () => {
     if (!brand.trim()) {
-      Alert.alert("Champ requis", "Renseigne au moins la marque.");
+      notify("Champ requis", "Renseigne au moins la marque.");
       return;
     }
     if (purchase <= 0 || target <= 0) {
-      Alert.alert("Prix invalides", "Saisis un prix d'achat et un prix de vente valides.");
+      notify("Prix invalides", "Saisis un prix d'achat et un prix de vente valides.");
       return;
     }
 

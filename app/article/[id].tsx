@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Image, ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, Text, View } from "react-native";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -18,6 +18,7 @@ import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleStatus } from "../../types";
 import { generateAiDescription, isAiConfigured } from "../../utils/ai";
+import { confirmAction, notify } from "../../utils/alert";
 import { marginPercent, netMargin } from "../../utils/calculations";
 import { generateDescription } from "../../utils/descriptionGenerator";
 import { formatDate, formatEUR, formatPercent } from "../../utils/format";
@@ -89,9 +90,9 @@ export default function ArticleDetailScreen() {
   // Génère la description via l'IA (repli automatique sur le modèle local en cas d'échec).
   const handleAi = async () => {
     if (!isAiConfigured()) {
-      Alert.alert(
+      notify(
         "IA non configurée",
-        "Configure Supabase (constants/supabase.ts) pour la génération IA. Voir le README.",
+        "Renseigne constants/aiConfig.ts pour la génération IA. Voir le README.",
       );
       return;
     }
@@ -100,27 +101,21 @@ export default function ArticleDetailScreen() {
       const text = await generateAiDescription(article);
       setAiDescription(text);
     } catch (e) {
-      Alert.alert("Génération IA impossible", (e as Error).message);
+      notify("Génération IA impossible", (e as Error).message);
     } finally {
       setAiLoading(false);
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert(
+    confirmAction(
       "Supprimer l'article",
       "Cette action est définitive.",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: () => {
-            deleteArticle(article.id);
-            router.back();
-          },
-        },
-      ],
+      "Supprimer",
+      () => {
+        deleteArticle(article.id);
+        router.back();
+      },
     );
   };
 

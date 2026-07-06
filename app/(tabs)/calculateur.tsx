@@ -9,7 +9,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
   Image,
   Keyboard,
   ScrollView,
@@ -33,12 +32,13 @@ import {
   marginPercent,
   netMargin,
 } from "../../utils/calculations";
-import { formatEUR, formatPercent, parseAmount } from "../../utils/format";
 import {
   isAiConfigured,
   parseScreenshot,
   type ProductParseResult,
 } from "../../utils/ai";
+import { notify } from "../../utils/alert";
+import { formatEUR, formatPercent, parseAmount } from "../../utils/format";
 
 export default function CalculateurScreen() {
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function CalculateurScreen() {
   // Sélectionne une image (galerie ou appareil), la compresse, l'analyse.
   const pickAndAnalyze = async (source: "library" | "camera") => {
     if (!isAiConfigured()) {
-      Alert.alert(
+      notify(
         "Analyse indisponible",
         "Configure le proxy IA (constants/aiConfig.ts). Voir le README.",
       );
@@ -79,7 +79,7 @@ export default function CalculateurScreen() {
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Permission refusée", "Autorise l'accès pour analyser une capture.");
+      notify("Permission refusée", "Autorise l'accès pour analyser une capture.");
       return;
     }
 
@@ -109,7 +109,7 @@ export default function CalculateurScreen() {
         setPurchaseStr(String(r.price).replace(".", ","));
       }
     } catch (e) {
-      Alert.alert("Analyse impossible", (e as Error).message);
+      notify("Analyse impossible", (e as Error).message);
     } finally {
       setAnalyzing(false);
     }

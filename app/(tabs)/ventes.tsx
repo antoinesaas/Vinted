@@ -1,7 +1,7 @@
 // ÉCRAN 5 — HISTORIQUE DES VENTES : liste chronologique + total + export CSV.
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
-import { Alert, FlatList, Text, View } from "react-native";
+import { FlatList, Text, View } from "react-native";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -11,6 +11,7 @@ import { Screen } from "../../components/Screen";
 import { TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
+import { notify } from "../../utils/alert";
 import { netMargin } from "../../utils/calculations";
 import { exportSalesCsv } from "../../utils/csv";
 import { formatEUR, formatShortDate } from "../../utils/format";
@@ -35,17 +36,17 @@ export default function VentesScreen() {
     [articles],
   );
 
-  // Export CSV via la feuille de partage iOS.
+  // Export CSV (téléchargement navigateur).
   const handleExport = async () => {
     if (sales.length === 0) return;
     try {
       setExporting(true);
       const ok = await exportSalesCsv(sales);
       if (!ok) {
-        Alert.alert("Partage indisponible", "Le partage n'est pas disponible sur cet appareil.");
+        notify("Export indisponible", "Le partage n'est pas disponible sur cet appareil.");
       }
     } catch {
-      Alert.alert("Erreur", "L'export CSV a échoué.");
+      notify("Erreur", "L'export CSV a échoué.");
     } finally {
       setExporting(false);
     }
@@ -119,7 +120,7 @@ export default function VentesScreen() {
           <EmptyState
             icon="cash-outline"
             title="Aucune vente"
-            subtitle="Marque un article comme vendu depuis le stock (swipe vers la gauche)."
+            subtitle="Marque un article comme vendu depuis le stock."
           />
         }
       />

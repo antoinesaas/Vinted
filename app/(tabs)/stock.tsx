@@ -1,7 +1,7 @@
-// ÉCRAN 2 — STOCK : liste filtrable des articles, actions par swipe.
+// ÉCRAN 2 — STOCK : liste filtrable des articles, actions explicites.
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, FlatList, View } from "react-native";
+import { FlatList, View } from "react-native";
 
 import { ArticleCard } from "../../components/ArticleCard";
 import { EmptyState } from "../../components/EmptyState";
@@ -14,6 +14,7 @@ import {
 } from "../../components/SegmentedControl";
 import { useStore } from "../../context/StoreContext";
 import type { Article, ArticleStatus } from "../../types";
+import { confirmAction } from "../../utils/alert";
 
 // Options du filtre : "all" + les trois statuts.
 type FilterValue = "all" | ArticleStatus;
@@ -41,17 +42,11 @@ export default function StockScreen() {
 
   // Confirmation avant suppression (action destructive).
   const confirmDelete = (article: Article) => {
-    Alert.alert(
+    confirmAction(
       "Supprimer l'article",
       `Supprimer « ${article.name || article.brand} » ? Cette action est définitive.`,
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: () => deleteArticle(article.id),
-        },
-      ],
+      "Supprimer",
+      () => deleteArticle(article.id),
     );
   };
 

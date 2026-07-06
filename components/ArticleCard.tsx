@@ -1,10 +1,8 @@
-// Ligne d'article dans le stock, avec actions par balayage (swipe).
-// - Swipe vers la GAUCHE  -> "Vendu"      (actions à droite)
-// - Swipe vers la DROITE  -> "Supprimer"  (actions à gauche)
+// Ligne d'article dans le stock, avec actions explicites (boutons).
+// (Pas de geste swipe : peu fiable au clavier/souris sur navigateur web.)
 import { Ionicons } from "@expo/vector-icons";
-import React, { useRef } from "react";
+import React from "react";
 import { Image, Pressable, Text, View } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
 
 import { CONDITION_LABELS, TYPE_LABELS } from "../constants/labels";
 import { colors } from "../constants/theme";
@@ -17,9 +15,9 @@ interface ArticleCardProps {
   article: Article;
   /** Ouvre le détail de l'article. */
   onPress: () => void;
-  /** Marque comme vendu (swipe gauche). */
+  /** Marque comme vendu. */
   onMarkSold: () => void;
-  /** Supprime l'article (swipe droite). */
+  /** Supprime l'article. */
   onDelete: () => void;
 }
 
@@ -29,7 +27,6 @@ export function ArticleCard({
   onMarkSold,
   onDelete,
 }: ArticleCardProps) {
-  const swipeRef = useRef<Swipeable>(null);
   const isSold = article.status === "vendu";
 
   // Prix de référence : prix vendu si vendu, sinon prix visé.
@@ -37,49 +34,11 @@ export function ArticleCard({
   const margin = netMargin(article.purchasePrice, sellPrice);
   const percent = marginPercent(article.purchasePrice, sellPrice);
 
-  // Action révélée par un swipe vers la gauche : marquer comme vendu.
-  const renderRightActions = () => {
-    if (isSold) return null;
-    return (
-      <Pressable
-        onPress={() => {
-          swipeRef.current?.close();
-          onMarkSold();
-        }}
-        className="my-1 w-28 items-center justify-center rounded-2xl bg-black"
-      >
-        <Ionicons name="checkmark-circle" size={26} color="#FFFFFF" />
-        <Text className="mt-1 text-sm font-semibold text-white">Vendu</Text>
-      </Pressable>
-    );
-  };
-
-  // Action révélée par un swipe vers la droite : supprimer.
-  const renderLeftActions = () => (
-    <Pressable
-      onPress={() => {
-        swipeRef.current?.close();
-        onDelete();
-      }}
-      className="my-1 w-28 items-center justify-center rounded-2xl"
-      style={{ backgroundColor: colors.danger }}
-    >
-      <Ionicons name="trash" size={24} color="#FFFFFF" />
-      <Text className="mt-1 text-sm font-semibold text-white">Supprimer</Text>
-    </Pressable>
-  );
-
   return (
-    <Swipeable
-      ref={swipeRef}
-      renderRightActions={renderRightActions}
-      renderLeftActions={renderLeftActions}
-      overshootRight={false}
-      overshootLeft={false}
-    >
+    <View className="my-1 rounded-2xl border border-line bg-white p-3">
       <Pressable
         onPress={onPress}
-        className="my-1 flex-row items-center rounded-2xl border border-line bg-white p-3 active:opacity-70"
+        className="flex-row items-center active:opacity-70"
       >
         {/* Photo ou placeholder */}
         {article.photoUri ? (
@@ -101,11 +60,9 @@ export function ArticleCard({
           <Text className="text-sm text-muted" numberOfLines={1}>
             {article.brand} · {article.size} · {CONDITION_LABELS[article.condition]}
           </Text>
-          <View className="mt-1 flex-row items-center">
-            <Text className="text-sm text-muted">
-              {formatEUR(article.purchasePrice)} → {formatEUR(sellPrice)}
-            </Text>
-          </View>
+          <Text className="mt-1 text-sm text-muted">
+            {formatEUR(article.purchasePrice)} → {formatEUR(sellPrice)}
+          </Text>
         </View>
 
         {/* Marge + statut */}
@@ -119,6 +76,34 @@ export function ArticleCard({
           <StatusBadge status={article.status} />
         </View>
       </Pressable>
-    </Swipeable>
+
+      {/* Actions explicites : marquer vendu / supprimer. */}
+      <View className="mt-2 flex-row justify-end border-t border-line pt-2">
+        {!isSold ? (
+          <Pressable
+            onPress={onMarkSold}
+            className="mr-2 flex-row items-center rounded-full bg-black px-3 py-1.5 active:opacity-70"
+          >
+            <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+            <Text className="ml-1 text-xs font-semibold text-white">
+              Vendu
+            </Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={onDelete}
+          className="flex-row items-center rounded-full px-3 py-1.5 active:opacity-70"
+          style={{ backgroundColor: `${colors.danger}1A` }}
+        >
+          <Ionicons name="trash" size={16} color={colors.danger} />
+          <Text
+            className="ml-1 text-xs font-semibold"
+            style={{ color: colors.danger }}
+          >
+            Supprimer
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }

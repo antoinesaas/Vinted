@@ -7,14 +7,6 @@
     "scheme": "stock01",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FFFFFF",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.stock01.app",
-      "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Stock.01 accède à vos photos pour ajouter l'image d'un article.",
-        "NSCameraUsageDescription": "Stock.01 utilise l'appareil photo pour photographier un article."
-      }
-    },
     "plugins": [
       "expo-router",
       [
@@ -26,6 +18,10 @@
       ],
       "expo-font"
     ],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "experiments": {
       "tsconfigPaths": true
     }

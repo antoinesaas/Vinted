@@ -2,6 +2,10 @@
 // Thème noir & blanc strict. Les seules couleurs "vives" servent uniquement
 // à l'indicateur de marge du calculateur (vert / orange / rouge).
 module.exports = {
+  // "class" (plutôt que le "media" par défaut) : requis par NativeWind sur
+  // le web pour pouvoir fixer explicitement le mode clair (app.json ->
+  // userInterfaceStyle), sinon react-native-css-interop lève une erreur.
+  darkMode: "class",
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",
     "./components/**/*.{js,jsx,ts,tsx}",

@@ -1,10 +1,13 @@
 # Stock.01 📦
 
-Application mobile iOS (React Native / Expo) pour gérer une activité de
-revente de vêtements sur Vinted. **100 % offline** : toutes les données sont
-stockées localement via `AsyncStorage`, aucun backend requis.
+Application web (React Native + Expo, exportée pour le web) pour gérer une
+activité de revente de vêtements sur Vinted. **Servie entièrement par Vercel**
+— aucune installation, aucune app mobile à lancer : il suffit d'ouvrir l'URL.
 
-Thème **noir & blanc strict**, minimaliste, rapide.
+👉 **https://stock01-proxy.vercel.app**
+
+Données stockées localement dans le navigateur (`localStorage`, via
+AsyncStorage). Thème **noir & blanc strict**, minimaliste, rapide.
 
 ---
 
@@ -13,13 +16,13 @@ Thème **noir & blanc strict**, minimaliste, rapide.
 | Onglet          | Écran                                                                 |
 | --------------- | --------------------------------------------------------------------- |
 | **Dashboard**   | CA du mois, bénéfice net, pièces vendues / en stock, marge moyenne, graphique de bénéfice hebdomadaire, bouton flottant « + ». |
-| **Stock**       | Liste des articles, filtre par statut, **swipe gauche = vendu**, **swipe droite = supprimer**. |
-| **Ventes**      | Historique chronologique, bénéfice cumulé, **export CSV**.            |
+| **Stock**       | Liste des articles, filtre par statut, boutons **Vendu** / **Supprimer**. |
+| **Ventes**      | Historique chronologique, bénéfice cumulé, **export CSV** (téléchargement navigateur). |
 | **Calculateur** | Marge brute / nette / %, indicateur couleur (🟢 > 50 %, 🟠 30-50 %, 🔴 < 30 %). |
 
 Écrans secondaires :
 
-- **Ajouter un article** (modal) : photo (galerie / appareil), marque, type,
+- **Ajouter un article** (modal) : photo (fichier local), marque, type,
   taille, état, prix d'achat, prix de vente. Marge nette et **prix conseillé
   (× 2,2)** calculés automatiquement.
 - **Détail article + Générateur de description Vinted** : description complète
@@ -36,76 +39,72 @@ Thème **noir & blanc strict**, minimaliste, rapide.
 
 ---
 
-## Prérequis
+## Utilisation
 
-- [Node.js](https://nodejs.org/) 18+ et npm
-- L'application **Expo Go** sur votre iPhone (iOS 15+), ou un simulateur iOS (macOS)
+Aucune installation nécessaire : ouvrez simplement
+**https://stock01-proxy.vercel.app** dans un navigateur (ordinateur ou
+téléphone). Sur iPhone, *Partager → Sur l'écran d'accueil* permet de l'ajouter
+comme une app.
 
-## Installation
+## Développement local
 
 ```bash
-# Depuis le dossier du projet
 npm install
-
-# (optionnel mais recommandé) aligner les versions natives sur le SDK Expo
-npx expo install --fix
+npm run web     # ouvre http://localhost:8081
 ```
 
-## Lancement
+## Déploiement (Vercel)
 
 ```bash
-npm start
+npx vercel deploy --prod --yes
 ```
 
-Puis scannez le QR code affiché avec l'appareil photo de votre iPhone
-(l'app **Expo Go** s'ouvre). Sur macOS, appuyez sur `i` pour ouvrir le
-simulateur iOS.
-
-> 💡 Windows : vous pouvez développer et tester via Expo Go sur un iPhone
-> physique. La génération d'un `.ipa` iOS nécessite macOS ou EAS Build (cloud).
+`vercel.json` construit l'export web Expo (`npx expo export --platform web`)
+et sert `dist/` en statique, avec une réécriture SPA (`/* -> /index.html`,
+sauf `/api/*`) pour que la navigation interne fonctionne au rechargement.
 
 ---
 
 ## Architecture
 
 ```
-app/                 Navigation (Expo Router, file-based)
+app/                 Navigation (Expo Router, file-based, export web)
   (tabs)/            Les 4 onglets
   article/           add.tsx (modal) + [id].tsx (détail + description)
+api/                 Fonction serverless Vercel (proxy IA OpenAI)
 components/          Composants réutilisables (Card, Button, ArticleCard…)
 context/             StoreContext : état global + persistance AsyncStorage
 types/               Types TypeScript stricts
-constants/           Thème, config métier, libellés
-utils/               Calculs, stats, générateur de description, CSV, storage
+constants/           Thème, config métier, libellés, config IA
+utils/               Calculs, stats, générateur de description, CSV, alertes
 ```
 
 ## Stack
 
-React Native · Expo SDK 51 · TypeScript (strict) · Expo Router ·
-NativeWind (Tailwind) · AsyncStorage · react-native-gesture-handler
+React Native + **react-native-web** · Expo SDK 51 (export web) · TypeScript
+(strict) · Expo Router · NativeWind (Tailwind) · AsyncStorage (→ localStorage
+sur le web) · Vercel (hébergement + fonction serverless)
 
 ---
 
-## Fonctions IA (optionnelles) — proxy Vercel
+## Fonctions IA — proxy Vercel
 
-Deux fonctionnalités passent par une **fonction serverless Vercel**
-(`api/stock01-ai.js`) pour garder la clé OpenAI **côté serveur** :
+Deux fonctionnalités passent par la **fonction serverless** `api/stock01-ai.js`
+pour garder la clé OpenAI **côté serveur** :
 
-- **Calculateur** : *Analyser une capture d'écran* Vinted (galerie ou photo).
-  La vision OpenAI en extrait la marque / taille / type / état / prix et
-  pré-remplit le prix d'achat. Si vous avez acheté la pièce, un bouton
-  *Ajouter au stock* ouvre le formulaire pré-rempli où vous **confirmez le coût
-  d'achat final** (pour des statistiques justes).
+- **Calculateur** : *Analyser une capture d'écran* Vinted. La vision OpenAI en
+  extrait la marque / taille / type / état / prix et pré-remplit le prix
+  d'achat. Si vous avez acheté la pièce, un bouton *Ajouter au stock* ouvre le
+  formulaire pré-rempli où vous **confirmez le coût d'achat final** (pour des
+  statistiques justes).
 - **Détail article** : bouton *Générer avec l'IA* pour une description +
   hashtags rédigés à partir du produit (repli automatique sur les templates
   locaux si l'IA est indisponible).
 
-Le proxy est déployé sur : **https://stock01-proxy.vercel.app/api/stock01-ai**
-(configuré dans [`constants/aiConfig.ts`](constants/aiConfig.ts)), et la clé
-OpenAI est déjà définie dans les variables d'environnement Vercel.
+La clé OpenAI est définie dans les variables d'environnement Vercel du projet
+(jamais dans le code, jamais envoyée au navigateur).
 
-**Pour changer / renouveler la clé OpenAI** (recommandé : régénérer la clé
-initiale qui a été exposée) :
+**Pour renouveler la clé OpenAI :**
 
 ```bash
 # saisit la clé sans qu'elle transite par un chat
@@ -113,12 +112,8 @@ echo "sk-votre-NOUVELLE-cle" | npx vercel env add OPENAI_API_KEY production
 npx vercel deploy --prod --yes
 ```
 
-> 🔐 La clé OpenAI ne doit **jamais** être mise dans le code de l'app : le
-> bundle mobile est extractible. Elle vit uniquement dans les variables
-> d'environnement Vercel. Tant qu'elle n'est pas définie, l'app reste
-> **100 % fonctionnelle offline** (description via templates locaux).
-
 ## Notes
 
-- Persistance 100 % locale : effacer l'app efface les données.
+- Données stockées dans le `localStorage` du navigateur utilisé : vider les
+  données de navigation du site efface le stock/l'historique.
 - Les seules couleurs non monochromes sont réservées à l'indicateur de marge.
