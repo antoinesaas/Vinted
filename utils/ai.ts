@@ -64,10 +64,10 @@ export async function generateAiListing(article: Article): Promise<Listing> {
       brand: article.brand,
       // Mot résolu (gère le type "autre" avec un libellé personnalisé).
       type: resolveTypeWord(article),
+      color: article.color,
+      material: article.material,
       size: article.size,
       condition: article.condition,
-      purchasePrice: article.purchasePrice,
-      targetPrice: article.targetPrice,
     },
   });
 }
@@ -79,6 +79,10 @@ export interface ProductParseResult {
   size: string;
   condition: ArticleCondition;
   type: ArticleType;
+  /** Couleur détectée sur la photo ("" si indéterminée). */
+  color: string;
+  /** Matière détectée sur la photo ("" si indéterminée). */
+  material: string;
   price: number | null;
   currency: string;
 }

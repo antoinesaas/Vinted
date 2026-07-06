@@ -48,6 +48,8 @@ export default function AddArticleScreen() {
     brand?: string;
     type?: string;
     customType?: string;
+    color?: string;
+    material?: string;
     size?: string;
     condition?: string;
     purchasePrice?: string;
@@ -77,6 +79,8 @@ export default function AddArticleScreen() {
   const [type, setType] = useState<ArticleType>(initialType);
   // Texte libre saisi quand le type "Autre" est sélectionné.
   const [customType, setCustomType] = useState(params.customType ?? "");
+  const [color, setColor] = useState(params.color ?? "");
+  const [material, setMaterial] = useState(params.material ?? "");
   const [size, setSize] = useState(params.size ?? "");
   const [condition, setCondition] = useState<ArticleCondition>(initialCondition);
   const [purchaseStr, setPurchaseStr] = useState(initialPurchase);
@@ -168,6 +172,8 @@ export default function AddArticleScreen() {
       brand: brand.trim(),
       type,
       customType: type === "autre" ? customType.trim() : "",
+      color: color.trim(),
+      material: material.trim(),
       size: size.trim(),
       condition,
       purchasePrice: purchase,
@@ -252,6 +258,20 @@ export default function AddArticleScreen() {
               value={size}
               onChangeText={setSize}
               autoCapitalize="characters"
+            />
+            <Input
+              className="mt-4"
+              label="Couleur (optionnel)"
+              placeholder="Ex : Bleu marine"
+              value={color}
+              onChangeText={setColor}
+            />
+            <Input
+              className="mt-4"
+              label="Matière (optionnel)"
+              placeholder="Ex : Coton, imperméable…"
+              value={material}
+              onChangeText={setMaterial}
             />
           </Card>
 

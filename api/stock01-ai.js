@@ -7,7 +7,7 @@
 // Endpoint : POST /api/stock01-ai
 //   { action: "generate_description", article: {...} }  -> { description }
 //   { action: "parse_screenshot", imageBase64, mimeType }
-//       -> { title, brand, size, condition, type, price, currency }
+//       -> { title, brand, size, color, material, condition, type, price, currency }
 //   { action: "estimate_resale_price", brand, typeWord, size, condition }
 //       -> { averagePrice, medianPrice, lowPrice, highPrice, sampleSize,
 //            currency, source: "vinted_search" | "ai_estimate", note }
@@ -51,34 +51,56 @@ async function callOpenAI(messages, temperature) {
 // ---- Action 1 : génération de titre + description Vinted --------
 async function generateDescription(article) {
   const system =
-    "Tu es un vendeur expert de vêtements d'occasion sur Vinted. " +
-    "Tu écris des annonces SIMPLES et efficaces en français. " +
-    "Tu réponds STRICTEMENT en JSON.";
+    "Tu es un vendeur expert sur Vinted qui optimise le référencement de ses " +
+    "annonces. Tu réponds STRICTEMENT en JSON.";
 
   const user =
     "Génère une annonce Vinted pour ce produit :\n" +
     JSON.stringify(article) +
-    '\n\nRéponds en JSON avec DEUX clés :\n' +
-    '- "title" : le titre de l\'annonce, court et efficace ' +
-    '(format : "Marque type taille — état", ex : "Nike t-shirt M — très bon état")\n' +
-    '- "description" : structurée EXACTEMENT ainsi :\n' +
-    "  * 1 à 2 phrases TRÈS SIMPLES et factuelles (marque, type, taille, " +
-    "état — pas de superlatifs, pas de storytelling, style direct)\n" +
-    "  * une ligne vide\n" +
-    '  * exactement : "Vendu sans retour. Questions bienvenues 👍"\n' +
-    "  * une ligne vide\n" +
-    "  * 18 à 25 hashtags pertinents (marque, type, taille, état, style " +
-    "vintage/streetwear/y2k/casual selon le cas, mots génériques : vinted, " +
-    "mode, secondemain, occasion, friperie, fashion, look, style, ootd, " +
-    "tendance), en minuscule, sans accent, séparés par des espaces, " +
-    "chacun commençant par #.";
+    '\n\nRéponds en JSON avec DEUX clés :\n\n' +
+    '"title" : un titre PRÉCIS et riche en mots-clés pour le référencement ' +
+    "Vinted. Inclut, dans cet ordre, ce qui est connu parmi : catégorie/type, " +
+    "nom de modèle ou détail technique si évident, matière, couleur, marque, " +
+    "genre si pertinent, taille. Exemple de bon titre : \"Veste coupe vent " +
+    "Patagonia H2no imperméable uni bleu marine technique homme - S\". " +
+    "Exemple de MAUVAIS titre (trop court, trop général) : \"Polaire " +
+    "Patagonia\". Ne laisse jamais de côté la couleur ou la matière si elles " +
+    "sont fournies.\n\n" +
+    '"description" : structurée EXACTEMENT comme cet exemple (mêmes tirets, ' +
+    "même ton neutre et factuel, PAS de phrase commerciale, PAS de " +
+    'superlatif) :\n' +
+    "Pull torsadé Ralph Lauren\n" +
+    "- authentique\n" +
+    "- taille S\n" +
+    "- aucun défaut / très bon état\n" +
+    "- Envoie en 24h ✅\n" +
+    "------------------\n" +
+    "#polaire #fleece #vintage #crazy #motif #cadeau #noël\n\n" +
+    "Règles pour la description :\n" +
+    '- Ligne 1 : reprend le titre en version courte (sans la marque répétée ' +
+    "si déjà évident)\n" +
+    '- puis une liste à tirets "- " : "authentique" (seulement si une marque ' +
+    "est connue), \"taille X\", puis EXACTEMENT l'une de ces 3 phrases selon " +
+    "l'état fourni (respecte le mot \"état\" à la fin) :\n" +
+    '    * état "bon"      -> "petites traces d\'usure / bon état"\n' +
+    '    * état "tres_bon" -> "aucun défaut / très bon état"\n' +
+    '    * état "parfait"  -> "jamais porté / état parfait"\n' +
+    "  puis \"Envoie en 24h ✅\"\n" +
+    '- puis une ligne de séparation faite uniquement de tirets ("------------------")\n' +
+    "- puis UNE SEULE ligne de 6 à 10 hashtags qui décrivent PRÉCISÉMENT ce " +
+    "produit précis (marque, type, matière, couleur, motif/style si connu, " +
+    "taille) : ils doivent servir à CATÉGORISER l'article sur Vinted, PAS à " +
+    "faire de la pub générique. N'inclus JAMAIS de hashtags génériques du " +
+    "type #mode #shopping #style #ootd #tendance #bonplan #vinted #fashion.\n" +
+    "- N'ajoute AUCUNE phrase du type \"vendu sans retour\" ou \"questions " +
+    "bienvenues\".";
 
   const result = await callOpenAI(
     [
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    0.7,
+    0.6,
   );
   return {
     title: typeof result.title === "string" ? result.title : "",
@@ -104,6 +126,9 @@ async function parseScreenshot(imageBase64, mimeType) {
     '- "title": titre court de l\'article\n' +
     '- "brand": marque ("" si inconnue)\n' +
     '- "size": taille (ex: "M", "42", "" si inconnue)\n' +
+    '- "color": couleur dominante visible sur la photo ("" si indéterminable)\n' +
+    '- "material": matière si identifiable (ex: "coton", "polaire", ' +
+    '"imperméable", "" si indéterminable)\n' +
     '- "price": prix affiché de l\'article, en nombre (le prix vendeur, PAS le ' +
     'total "protection acheteurs")\n' +
     '- "currency": code devise (ex: "EUR")\n' +
@@ -138,6 +163,8 @@ async function parseScreenshot(imageBase64, mimeType) {
     title: result.title ?? "",
     brand: result.brand ?? "",
     size: result.size ?? "",
+    color: result.color ?? "",
+    material: result.material ?? "",
     condition: result.condition ?? "tres_bon",
     type: result.type ?? "autre",
     price,

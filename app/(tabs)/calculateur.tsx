@@ -27,7 +27,7 @@ import {
   SegmentedControl,
   type SegmentOption,
 } from "../../components/SegmentedControl";
-import { SACHET_FEE } from "../../constants/config";
+import { BUYER_PROTECTION_FEE, BUYER_SHIPPING_FEE, SACHET_FEE } from "../../constants/config";
 import { CONDITION_LABELS, resolveTypeWord, TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import type { ArticleCondition, ArticleType } from "../../types";
@@ -40,12 +40,14 @@ import {
 } from "../../utils/ai";
 import { notify } from "../../utils/alert";
 import {
+  BUYER_FEES_TOTAL,
   grossMargin,
   multiplierLabel,
   multiplierLevel,
   netMargin,
   recommendedPurchaseRange,
   resaleMultiplier,
+  totalPurchaseCost,
 } from "../../utils/calculations";
 import { formatEUR, parseAmount } from "../../utils/format";
 
@@ -67,6 +69,8 @@ export default function CalculateurScreen() {
   const [type, setType] = useState<ArticleType>("tshirt");
   // Texte libre saisi quand le type "Autre" est sélectionné.
   const [customType, setCustomType] = useState("");
+  const [color, setColor] = useState("");
+  const [material, setMaterial] = useState("");
   const [size, setSize] = useState("");
   const [condition, setCondition] = useState<ArticleCondition>("tres_bon");
 
@@ -85,10 +89,15 @@ export default function CalculateurScreen() {
   const [searching, setSearching] = useState(false);
   const [resale, setResale] = useState<ResalePriceResult | null>(null);
 
-  const purchase = parseAmount(purchaseStr);
+  // `purchaseStr` est le PRIX AFFICHÉ de l'annonce. Le coût réel payé par
+  // l'acheteur inclut en plus la protection acheteur (~2 €) et la
+  // livraison (~3,5 €) : c'est ce coût total qui sert de base au calcul
+  // de marge, pas le simple prix affiché.
+  const displayedPrice = parseAmount(purchaseStr);
+  const purchase = totalPurchaseCost(displayedPrice);
   const sell = parseAmount(sellStr);
 
-  // Calculs en temps réel.
+  // Calculs en temps réel (basés sur le coût d'achat réel total).
   const result = useMemo(() => {
     const gross = grossMargin(purchase, sell);
     const net = netMargin(purchase, sell);
@@ -96,11 +105,21 @@ export default function CalculateurScreen() {
     return { gross, net, multiplier, level: multiplierLevel(multiplier) };
   }, [purchase, sell]);
 
-  // Fourchette de prix d'achat conseillée (à partir du prix de vente),
-  // affichée quand le deal actuel n'est pas satisfaisant.
-  const purchaseRange = useMemo(() => recommendedPurchaseRange(sell), [sell]);
+  // Fourchette de PRIX AFFICHÉ conseillée (à partir du prix de vente),
+  // affichée quand le deal actuel n'est pas satisfaisant. On retranche les
+  // frais acheteur au coût total cible pour obtenir le prix à viser sur
+  // l'annonce elle-même.
+  const purchaseRange = useMemo(() => {
+    const totalRange = recommendedPurchaseRange(sell);
+    const toDisplayed = (n: number) => Math.max(0, Math.round((n - BUYER_FEES_TOTAL) * 100) / 100);
+    return {
+      low: toDisplayed(totalRange.low),
+      high: toDisplayed(totalRange.high),
+      max: toDisplayed(totalRange.max),
+    };
+  }, [sell]);
 
-  const hasInput = purchase > 0 && sell > 0;
+  const hasInput = displayedPrice > 0 && sell > 0;
 
   // Sélectionne une image (galerie ou appareil), la compresse, l'analyse.
   const pickAndAnalyze = async (source: "library" | "camera") => {
@@ -149,6 +168,8 @@ export default function CalculateurScreen() {
       setType(r.type);
       setSize(r.size);
       setCondition(r.condition);
+      setColor(r.color);
+      setMaterial(r.material);
       if (r.price != null) {
         setPurchaseStr(String(r.price).replace(".", ","));
       }
@@ -198,11 +219,13 @@ export default function CalculateurScreen() {
         brand,
         type,
         customType,
+        color,
+        material,
         size,
         condition,
-        // Le prix d'achat est PROPOSÉ : l'écran d'ajout demande de confirmer
-        // le coût d'achat réellement payé.
-        purchasePrice: purchaseStr,
+        // Coût d'achat RÉEL (prix affiché + frais acheteur) PROPOSÉ :
+        // l'écran d'ajout demande de confirmer le coût réellement payé.
+        purchasePrice: purchase > 0 ? String(purchase).replace(".", ",") : "",
         photoUri: screenshotUri ?? "",
       },
     });
@@ -253,7 +276,7 @@ export default function CalculateurScreen() {
                     className="mr-3 h-12 w-12 rounded-lg bg-line"
                   />
                   <Text className="flex-1 text-sm text-ink" numberOfLines={2}>
-                    Prix d'achat détecté : {purchaseStr ? `${purchaseStr} €` : "—"}
+                    Prix affiché détecté : {purchaseStr ? `${purchaseStr} €` : "—"}
                   </Text>
                 </View>
               ) : null}
@@ -295,18 +318,40 @@ export default function CalculateurScreen() {
                 value={condition}
                 onChange={setCondition}
               />
+
+              <Input
+                className="mt-4"
+                label="Couleur (optionnel)"
+                placeholder="Ex : Bleu marine"
+                value={color}
+                onChangeText={setColor}
+              />
+              <Input
+                className="mt-4"
+                label="Matière (optionnel)"
+                placeholder="Ex : Coton, imperméable…"
+                value={material}
+                onChangeText={setMaterial}
+              />
             </Card>
 
             {/* Prix d'achat + recherche du vrai prix de revente */}
             <Card className="mt-3">
               <Input
-                label="Prix d'achat"
+                label="Prix affiché de l'annonce"
                 placeholder="0,00"
                 keyboardType="decimal-pad"
                 value={purchaseStr}
                 onChangeText={setPurchaseStr}
                 suffix="€"
               />
+              {displayedPrice > 0 ? (
+                <Text className="mt-2 text-xs text-muted">
+                  {formatEUR(displayedPrice)} + protection ({formatEUR(BUYER_PROTECTION_FEE)}) +
+                  livraison ({formatEUR(BUYER_SHIPPING_FEE)}) = coût réel{" "}
+                  <Text className="font-semibold text-ink">{formatEUR(purchase)}</Text>
+                </Text>
+              ) : null}
 
               <Button
                 title={searching ? "Recherche…" : "Rechercher le prix de revente réel"}
@@ -363,7 +408,7 @@ export default function CalculateurScreen() {
               />
               <View className="my-2 h-px bg-line" />
               <ResultRow
-                label="Multiplicateur du prix d'achat"
+                label="Multiplicateur du coût réel"
                 value={result.multiplier > 0 ? `x${result.multiplier.toFixed(2)}` : "—"}
               />
             </Card>
@@ -388,7 +433,7 @@ export default function CalculateurScreen() {
                 <View className="flex-row items-center">
                   <Ionicons name="bulb-outline" size={18} color={colors.text} />
                   <Text className="ml-2 text-sm font-semibold text-ink">
-                    Prix d'achat conseillé pour ce prix de vente
+                    Prix affiché conseillé pour ce prix de vente
                   </Text>
                 </View>
                 <Text className="mt-2 text-2xl font-bold text-ink">
@@ -396,8 +441,8 @@ export default function CalculateurScreen() {
                 </Text>
                 <Text className="mt-1 text-xs text-muted">
                   Pour un deal cible (x2 à x2,5) sur un prix de vente de{" "}
-                  {formatEUR(sell)}. À ne pas dépasser : {formatEUR(purchaseRange.max)}{" "}
-                  (minimum acceptable x1,5).
+                  {formatEUR(sell)}, frais acheteur inclus. À ne pas dépasser :{" "}
+                  {formatEUR(purchaseRange.max)} (minimum acceptable x1,5).
                 </Text>
               </Card>
             ) : null}

@@ -36,19 +36,16 @@ export default function ArticleDetailScreen() {
 
   const article = getArticle(id);
 
-  // Compteur de régénération : incrémenté pour varier la phrase locale.
-  const [seed, setSeed] = useState(0);
   // Champ copié à l'instant ("title" | "description" | null).
   const [copied, setCopied] = useState<"title" | "description" | null>(null);
   // Annonce produite par l'IA (null tant qu'on utilise le modèle local).
   const [aiListing, setAiListing] = useState<Listing | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Annonce locale (templates hors-ligne), recalculée selon le seed.
+  // Annonce locale (hors-ligne, format fixe).
   const localListing = useMemo(
-    () =>
-      article ? generateListing(article, seed) : { title: "", description: "" },
-    [article, seed],
+    () => (article ? generateListing(article) : { title: "", description: "" }),
+    [article],
   );
 
   // Annonce affichée : IA si disponible, sinon modèle local.
@@ -179,8 +176,16 @@ export default function ArticleDetailScreen() {
               {article.name || `${article.brand} ${resolveTypeLabel(article)}`}
             </Text>
             <Text className="mt-1 text-base text-muted">
-              {article.brand} · {resolveTypeLabel(article)} · {article.size} ·{" "}
-              {CONDITION_LABELS[article.condition]}
+              {[
+                article.brand,
+                resolveTypeLabel(article),
+                article.color,
+                article.material,
+                article.size,
+                CONDITION_LABELS[article.condition],
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </Text>
           </View>
           <StatusBadge status={article.status} />
@@ -285,16 +290,15 @@ export default function ArticleDetailScreen() {
         />
 
         <View className="mt-2 flex-row">
-          <Button
-            title="Modèle local"
-            icon="refresh"
-            variant="secondary"
-            className="mr-2 flex-1"
-            onPress={() => {
-              setAiListing(null);
-              setSeed((s) => s + 1);
-            }}
-          />
+          {aiListing ? (
+            <Button
+              title="Modèle local"
+              icon="refresh"
+              variant="secondary"
+              className="mr-2 flex-1"
+              onPress={() => setAiListing(null)}
+            />
+          ) : null}
           <Button
             title={copied === "description" ? "Copié !" : "Copier description"}
             icon={copied === "description" ? "checkmark" : "copy-outline"}

@@ -103,17 +103,49 @@ function downloadInBrowser(csv: string): void {
   }, 1000);
 }
 
+/** Navigator étendu avec l'API Web Share (partage de fichiers, niveau 2). */
+interface ShareNavigator {
+  canShare?: (data: { files: File[] }) => boolean;
+  share?: (data: { files: File[]; title?: string }) => Promise<void>;
+}
+
+/**
+ * Ouvre la feuille de partage native (mobile) pour choisir l'app cible
+ * (Google Sheets, Drive, Mail…). Sur desktop / navigateurs sans support,
+ * on retombe sur un téléchargement direct du fichier.
+ */
+async function shareOrDownload(csv: string): Promise<void> {
+  const file = new File([csv], "ventes-stock01.csv", { type: "text/csv" });
+  const nav = navigator as unknown as ShareNavigator;
+
+  if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+    try {
+      await nav.share({ files: [file], title: "Ventes Stock.01" });
+      return;
+    } catch (e) {
+      // L'utilisateur a annulé le partage : ne pas déclencher de téléchargement.
+      if (e instanceof Error && e.name === "AbortError") return;
+      // Autre échec (app cible indisponible…) : repli sur le téléchargement.
+    }
+  }
+
+  downloadInBrowser(csv);
+}
+
 /**
  * Exporte le CSV des ventes.
- * - Sur le web : télécharge directement le fichier dans le navigateur.
- * - Sur iOS/Android : écrit un fichier temporaire puis ouvre le partage natif.
+ * - Sur le web (mobile) : ouvre la feuille de partage native pour choisir
+ *   l'app cible (Google Sheets, Drive…), avec repli sur un téléchargement
+ *   direct si le partage de fichiers n'est pas supporté (desktop).
+ * - Sur iOS/Android natif : écrit un fichier temporaire puis ouvre le
+ *   partage natif.
  * Lève une erreur détaillée en cas d'échec (affichée par l'appelant).
  */
 export async function exportSalesCsv(sales: Article[]): Promise<boolean> {
   const csv = buildSalesCsv(sales);
 
   if (Platform.OS === "web") {
-    downloadInBrowser(csv);
+    await shareOrDownload(csv);
     return true;
   }
 

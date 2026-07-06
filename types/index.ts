@@ -23,6 +23,10 @@ export interface Article {
   type: ArticleType;
   /** Texte libre saisi quand `type` vaut "autre" (ex : "Salopette"). */
   customType: string;
+  /** Couleur (ex : "Bleu marine"), optionnelle. */
+  color: string;
+  /** Matière (ex : "Coton", "Imperméable"), optionnelle. */
+  material: string;
   /** Taille (ex : "M", "42", "L"). */
   size: string;
   /** État de la pièce. */
@@ -53,6 +57,8 @@ export type ArticleInput = Pick<
   | "brand"
   | "type"
   | "customType"
+  | "color"
+  | "material"
   | "size"
   | "condition"
   | "purchasePrice"
