@@ -66,3 +66,27 @@ export function multiplierLabel(multiplier: number): string {
   if (multiplier >= RESALE_MULTIPLIER_THRESHOLDS.min) return "Minimum acceptable";
   return "Deal insuffisant";
 }
+
+/** Fourchette de prix d'achat conseillée. */
+export interface PurchaseRange {
+  /** Prix d'achat max pour un deal excellent (x2,5). */
+  low: number;
+  /** Prix d'achat max pour un deal cible (x2). */
+  high: number;
+  /** Prix d'achat max pour rester au minimum acceptable (x1,5). */
+  max: number;
+}
+
+/**
+ * À partir du prix de vente, calcule la fourchette de prix d'achat à ne pas
+ * dépasser pour obtenir une marge convenable (cible x2-x2,5, plafond x1,5).
+ */
+export function recommendedPurchaseRange(sell: number): PurchaseRange {
+  if (sell <= 0) return { low: 0, high: 0, max: 0 };
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return {
+    low: round(sell / RESALE_MULTIPLIER_THRESHOLDS.excellent),
+    high: round(sell / RESALE_MULTIPLIER_THRESHOLDS.target),
+    max: round(sell / RESALE_MULTIPLIER_THRESHOLDS.min),
+  };
+}

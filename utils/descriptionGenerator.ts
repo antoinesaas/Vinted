@@ -4,7 +4,7 @@
 // + un maximum de hashtags pertinents.
 // ============================================================
 
-import { CONDITION_LABELS, TYPE_WORDS } from "../constants/labels";
+import { CONDITION_LABELS, resolveTypeWord } from "../constants/labels";
 import type { Article } from "../types";
 
 /** Annonce générée : titre + description (même forme que l'IA). */
@@ -81,7 +81,7 @@ const BASE_TAGS = [
 
 /** Construit la liste complète des hashtags (dédupliqués, ~20). */
 function buildHashtags(article: Article): string {
-  const typeWord = TYPE_WORDS[article.type];
+  const typeWord = resolveTypeWord(article);
   const tags = [
     toHashtag(article.brand),
     toHashtag(typeWord),
@@ -107,7 +107,7 @@ export function generateListing(
   article: Article,
   seed?: number,
 ): GeneratedListing {
-  const typeWord = TYPE_WORDS[article.type];
+  const typeWord = resolveTypeWord(article);
   const condition = CONDITION_LABELS[article.condition].toLowerCase();
   const brand = article.brand || "Sans marque";
   const size = article.size || "unique";

@@ -5,6 +5,7 @@
 // ============================================================
 
 import { AI_API_URL, AI_APP_KEY, isAiConfigured } from "../constants/aiConfig";
+import { resolveTypeWord } from "../constants/labels";
 import type { Article, ArticleCondition, ArticleType } from "../types";
 
 export { isAiConfigured };
@@ -61,7 +62,8 @@ export async function generateAiListing(article: Article): Promise<Listing> {
     article: {
       name: article.name,
       brand: article.brand,
-      type: article.type,
+      // Mot résolu (gère le type "autre" avec un libellé personnalisé).
+      type: resolveTypeWord(article),
       size: article.size,
       condition: article.condition,
       purchasePrice: article.purchasePrice,
@@ -116,17 +118,21 @@ export interface ResalePriceResult {
  * Recherche le prix de revente réel d'un produit à partir d'annonces
  * comparables actuellement en ligne sur Vinted (avec repli sur une
  * estimation IA si la recherche échoue).
+ *
+ * @param typeWord Mot du type déjà résolu (voir `resolveTypeWord`), pour
+ *                 que la recherche fonctionne aussi avec un type "autre"
+ *                 personnalisé.
  */
 export async function estimateResalePrice(
   brand: string,
-  type: ArticleType,
+  typeWord: string,
   size: string,
   condition: ArticleCondition,
 ): Promise<ResalePriceResult> {
   return callFunction<ResalePriceResult>({
     action: "estimate_resale_price",
     brand,
-    type,
+    typeWord,
     size,
     condition,
   });

@@ -8,7 +8,7 @@ import { Card } from "../../components/Card";
 import { EmptyState } from "../../components/EmptyState";
 import { Header } from "../../components/Header";
 import { Screen } from "../../components/Screen";
-import { TYPE_LABELS } from "../../constants/labels";
+import { resolveTypeLabel } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import { notify } from "../../utils/alert";
@@ -175,7 +175,7 @@ export default function VentesScreen() {
               </View>
               <View className="flex-1">
                 <Text className="text-base font-semibold text-ink" numberOfLines={1}>
-                  {item.name || `${item.brand} ${TYPE_LABELS[item.type]}`}
+                  {item.name || `${item.brand} ${resolveTypeLabel(item)}`}
                 </Text>
                 <Text className="text-sm text-muted">
                   {item.soldAt ? formatShortDate(item.soldAt) : ""} ·{" "}

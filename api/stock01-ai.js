@@ -8,7 +8,7 @@
 //   { action: "generate_description", article: {...} }  -> { description }
 //   { action: "parse_screenshot", imageBase64, mimeType }
 //       -> { title, brand, size, condition, type, price, currency }
-//   { action: "estimate_resale_price", brand, type, size, condition }
+//   { action: "estimate_resale_price", brand, typeWord, size, condition }
 //       -> { averagePrice, medianPrice, lowPrice, highPrice, sampleSize,
 //            currency, source: "vinted_search" | "ai_estimate", note }
 //
@@ -147,8 +147,6 @@ async function parseScreenshot(imageBase64, mimeType) {
 
 // ---- Action 3 : recherche du prix de revente réel sur Vinted ----
 
-const TYPE_WORDS = { tshirt: "t-shirt", short: "short", veste: "veste", autre: "" };
-
 // Statuts Vinted (texte affiché) correspondant à chacun de nos états.
 const CONDITION_MATCH = {
   bon: ["bon état", "satisfaisant"],
@@ -276,8 +274,7 @@ async function aiFallbackEstimate(brand, typeWord, size, condition) {
   };
 }
 
-async function estimateResalePrice({ brand, type, size, condition }) {
-  const typeWord = TYPE_WORDS[type] || "";
+async function estimateResalePrice({ brand, typeWord, size, condition }) {
   const query = [brand, typeWord].filter(Boolean).join(" ").trim();
   if (!query) {
     return { _status: 400, error: "Marque ou type manquant pour la recherche." };
@@ -405,7 +402,7 @@ module.exports = async (req, res) => {
     if (payload.action === "estimate_resale_price") {
       const result = await estimateResalePrice({
         brand: payload.brand || "",
-        type: payload.type || "autre",
+        typeWord: payload.typeWord || "",
         size: payload.size || "",
         condition: payload.condition || "tres_bon",
       });

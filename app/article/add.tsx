@@ -47,6 +47,7 @@ export default function AddArticleScreen() {
     name?: string;
     brand?: string;
     type?: string;
+    customType?: string;
     size?: string;
     condition?: string;
     purchasePrice?: string;
@@ -74,6 +75,8 @@ export default function AddArticleScreen() {
   const [name, setName] = useState(params.name ?? "");
   const [brand, setBrand] = useState(params.brand ?? "");
   const [type, setType] = useState<ArticleType>(initialType);
+  // Texte libre saisi quand le type "Autre" est sélectionné.
+  const [customType, setCustomType] = useState(params.customType ?? "");
   const [size, setSize] = useState(params.size ?? "");
   const [condition, setCondition] = useState<ArticleCondition>(initialCondition);
   const [purchaseStr, setPurchaseStr] = useState(initialPurchase);
@@ -89,6 +92,12 @@ export default function AddArticleScreen() {
   const purchase = parseAmount(purchaseStr);
   const target = parseAmount(targetStr);
   const margin = netMargin(purchase, target);
+
+  // Change de type : on efface le texte libre si on quitte "Autre".
+  const handleTypeChange = (value: ArticleType) => {
+    setType(value);
+    if (value !== "autre") setCustomType("");
+  };
 
   // À chaque changement du prix d'achat, on propose un prix de vente
   // conseillé (× 2,2) tant que l'utilisateur n'a rien saisi manuellement.
@@ -158,6 +167,7 @@ export default function AddArticleScreen() {
       name: name.trim(),
       brand: brand.trim(),
       type,
+      customType: type === "autre" ? customType.trim() : "",
       size: size.trim(),
       condition,
       purchasePrice: purchase,
@@ -252,8 +262,16 @@ export default function AddArticleScreen() {
           <SegmentedControl
             options={TYPE_OPTIONS}
             value={type}
-            onChange={setType}
+            onChange={handleTypeChange}
           />
+          {type === "autre" ? (
+            <Input
+              className="mt-3"
+              placeholder="Précise le type (ex : Salopette, Bonnet…)"
+              value={customType}
+              onChangeText={setCustomType}
+            />
+          ) : null}
 
           {/* État */}
           <Text className="mb-2 mt-5 text-sm font-medium text-muted">État</Text>

@@ -21,6 +21,8 @@ export interface Article {
   brand: string;
   /** Type de pièce. */
   type: ArticleType;
+  /** Texte libre saisi quand `type` vaut "autre" (ex : "Salopette"). */
+  customType: string;
   /** Taille (ex : "M", "42", "L"). */
   size: string;
   /** État de la pièce. */
@@ -50,6 +52,7 @@ export type ArticleInput = Pick<
   | "name"
   | "brand"
   | "type"
+  | "customType"
   | "size"
   | "condition"
   | "purchasePrice"

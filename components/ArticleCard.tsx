@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Image, Pressable, Text, View } from "react-native";
 
-import { CONDITION_LABELS, TYPE_LABELS } from "../constants/labels";
+import { CONDITION_LABELS, resolveTypeLabel } from "../constants/labels";
 import { colors } from "../constants/theme";
 import type { Article } from "../types";
 import { marginPercent, netMargin } from "../utils/calculations";
@@ -55,7 +55,7 @@ export function ArticleCard({
         {/* Infos principales */}
         <View className="ml-3 flex-1">
           <Text className="text-base font-semibold text-ink" numberOfLines={1}>
-            {article.name || TYPE_LABELS[article.type]}
+            {article.name || resolveTypeLabel(article)}
           </Text>
           <Text className="text-sm text-muted" numberOfLines={1}>
             {article.brand} · {article.size} · {CONDITION_LABELS[article.condition]}

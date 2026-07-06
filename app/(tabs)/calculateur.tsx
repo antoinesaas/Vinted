@@ -28,7 +28,7 @@ import {
   type SegmentOption,
 } from "../../components/SegmentedControl";
 import { SACHET_FEE } from "../../constants/config";
-import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
+import { CONDITION_LABELS, resolveTypeWord, TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import type { ArticleCondition, ArticleType } from "../../types";
 import {
@@ -44,6 +44,7 @@ import {
   multiplierLabel,
   multiplierLevel,
   netMargin,
+  recommendedPurchaseRange,
   resaleMultiplier,
 } from "../../utils/calculations";
 import { formatEUR, parseAmount } from "../../utils/format";
@@ -64,8 +65,16 @@ export default function CalculateurScreen() {
   // Attributs du produit (pré-remplis par la capture, éditables manuellement).
   const [brand, setBrand] = useState("");
   const [type, setType] = useState<ArticleType>("tshirt");
+  // Texte libre saisi quand le type "Autre" est sélectionné.
+  const [customType, setCustomType] = useState("");
   const [size, setSize] = useState("");
   const [condition, setCondition] = useState<ArticleCondition>("tres_bon");
+
+  // Change de type : on efface le texte libre si on quitte "Autre".
+  const handleTypeChange = (value: ArticleType) => {
+    setType(value);
+    if (value !== "autre") setCustomType("");
+  };
 
   // Analyse de capture d'écran.
   const [analyzing, setAnalyzing] = useState(false);
@@ -86,6 +95,10 @@ export default function CalculateurScreen() {
     const multiplier = resaleMultiplier(purchase, sell);
     return { gross, net, multiplier, level: multiplierLevel(multiplier) };
   }, [purchase, sell]);
+
+  // Fourchette de prix d'achat conseillée (à partir du prix de vente),
+  // affichée quand le deal actuel n'est pas satisfaisant.
+  const purchaseRange = useMemo(() => recommendedPurchaseRange(sell), [sell]);
 
   const hasInput = purchase > 0 && sell > 0;
 
@@ -163,7 +176,8 @@ export default function CalculateurScreen() {
     try {
       setSearching(true);
       Keyboard.dismiss();
-      const r = await estimateResalePrice(brand.trim(), type, size.trim(), condition);
+      const typeWord = resolveTypeWord({ type, customType });
+      const r = await estimateResalePrice(brand.trim(), typeWord, size.trim(), condition);
       setResale(r);
       if (r.averagePrice != null) {
         setSellStr(String(r.averagePrice).replace(".", ","));
@@ -183,6 +197,7 @@ export default function CalculateurScreen() {
         name: detected?.title ?? "",
         brand,
         type,
+        customType,
         size,
         condition,
         // Le prix d'achat est PROPOSÉ : l'écran d'ajout demande de confirmer
@@ -264,7 +279,15 @@ export default function CalculateurScreen() {
               <Text className="mb-2 mt-4 text-sm font-medium text-muted">
                 Type de pièce
               </Text>
-              <SegmentedControl options={TYPE_OPTIONS} value={type} onChange={setType} />
+              <SegmentedControl options={TYPE_OPTIONS} value={type} onChange={handleTypeChange} />
+              {type === "autre" ? (
+                <Input
+                  className="mt-3"
+                  placeholder="Précise le type (ex : Salopette, Bonnet…)"
+                  value={customType}
+                  onChangeText={setCustomType}
+                />
+              ) : null}
 
               <Text className="mb-2 mt-4 text-sm font-medium text-muted">État</Text>
               <SegmentedControl
@@ -357,12 +380,34 @@ export default function CalculateurScreen() {
                   Cible : x2 à x2,5 le prix d'achat · minimum acceptable : x1,5
                 </Text>
               </View>
-            ) : (
+            ) : null}
+
+            {/* Marge trop faible : prix d'achat conseillé pour un deal correct. */}
+            {hasInput && result.level !== "high" ? (
+              <Card className="mt-3">
+                <View className="flex-row items-center">
+                  <Ionicons name="bulb-outline" size={18} color={colors.text} />
+                  <Text className="ml-2 text-sm font-semibold text-ink">
+                    Prix d'achat conseillé pour ce prix de vente
+                  </Text>
+                </View>
+                <Text className="mt-2 text-2xl font-bold text-ink">
+                  {formatEUR(purchaseRange.low)} – {formatEUR(purchaseRange.high)}
+                </Text>
+                <Text className="mt-1 text-xs text-muted">
+                  Pour un deal cible (x2 à x2,5) sur un prix de vente de{" "}
+                  {formatEUR(sell)}. À ne pas dépasser : {formatEUR(purchaseRange.max)}{" "}
+                  (minimum acceptable x1,5).
+                </Text>
+              </Card>
+            ) : null}
+
+            {!hasInput ? (
               <Text className="mt-6 text-center text-sm text-muted">
                 Renseigne un prix d'achat et un prix de vente (ou lance la
                 recherche du prix de revente réel) pour évaluer le deal.
               </Text>
-            )}
+            ) : null}
 
             {/* Ajout au stock si la pièce a été achetée. */}
             {hasInput ? (

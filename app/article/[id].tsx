@@ -13,7 +13,7 @@ import {
   type SegmentOption,
 } from "../../components/SegmentedControl";
 import { StatusBadge } from "../../components/StatusBadge";
-import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
+import { CONDITION_LABELS, resolveTypeLabel } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleStatus } from "../../types";
@@ -176,10 +176,10 @@ export default function ArticleDetailScreen() {
         <View className="mt-2 flex-row items-start justify-between">
           <View className="flex-1 pr-3">
             <Text className="text-2xl font-bold text-ink">
-              {article.name || `${article.brand} ${TYPE_LABELS[article.type]}`}
+              {article.name || `${article.brand} ${resolveTypeLabel(article)}`}
             </Text>
             <Text className="mt-1 text-base text-muted">
-              {article.brand} · {TYPE_LABELS[article.type]} · {article.size} ·{" "}
+              {article.brand} · {resolveTypeLabel(article)} · {article.size} ·{" "}
               {CONDITION_LABELS[article.condition]}
             </Text>
           </View>

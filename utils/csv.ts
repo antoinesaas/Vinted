@@ -9,7 +9,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 
-import { CONDITION_LABELS, STATUS_LABELS, TYPE_LABELS } from "../constants/labels";
+import { CONDITION_LABELS, resolveTypeLabel, STATUS_LABELS } from "../constants/labels";
 import type { Article } from "../types";
 import { netMargin } from "./calculations";
 import { formatDate } from "./format";
@@ -52,7 +52,7 @@ export function buildSalesCsv(sales: Article[]): string {
     ...sales.map((a): Array<string | number> => [
       a.name,
       a.brand,
-      TYPE_LABELS[a.type],
+      resolveTypeLabel(a),
       a.size,
       CONDITION_LABELS[a.condition],
       STATUS_LABELS[a.status],
