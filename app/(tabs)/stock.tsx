@@ -14,7 +14,7 @@ import {
 } from "../../components/SegmentedControl";
 import { useStore } from "../../context/StoreContext";
 import type { Article, ArticleStatus } from "../../types";
-import { confirmAction } from "../../utils/alert";
+import { confirmAction, promptAmount } from "../../utils/alert";
 
 // Options du filtre : "all" + les trois statuts.
 type FilterValue = "all" | ArticleStatus;
@@ -39,6 +39,19 @@ export default function StockScreen() {
         : articles.filter((a) => a.status === filter),
     [articles, filter],
   );
+
+  // Passage en "vendu" : on demande le PRIX DE VENTE FINAL pour que les
+  // statistiques (CA, bénéfice, marge) reflètent la réalité.
+  const handleMarkSold = async (article: Article) => {
+    const price = await promptAmount(
+      "Prix de vente final",
+      `À combien as-tu réellement vendu « ${article.name || article.brand} » ?`,
+      article.targetPrice,
+    );
+    if (price !== null) {
+      markAsSold(article.id, price);
+    }
+  };
 
   // Confirmation avant suppression (action destructive).
   const confirmDelete = (article: Article) => {
@@ -80,7 +93,7 @@ export default function StockScreen() {
           <ArticleCard
             article={item}
             onPress={() => router.push(`/article/${item.id}`)}
-            onMarkSold={() => markAsSold(item.id)}
+            onMarkSold={() => handleMarkSold(item)}
             onDelete={() => confirmDelete(item)}
           />
         )}

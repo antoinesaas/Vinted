@@ -17,10 +17,10 @@ import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleStatus } from "../../types";
-import { generateAiDescription, isAiConfigured } from "../../utils/ai";
-import { confirmAction, notify } from "../../utils/alert";
+import { generateAiListing, isAiConfigured, type Listing } from "../../utils/ai";
+import { confirmAction, notify, promptAmount } from "../../utils/alert";
 import { marginPercent, netMargin } from "../../utils/calculations";
-import { generateDescription } from "../../utils/descriptionGenerator";
+import { generateListing } from "../../utils/descriptionGenerator";
 import { formatDate, formatEUR, formatPercent } from "../../utils/format";
 
 // Statuts sélectionnables tant que l'article n'est pas vendu.
@@ -38,24 +38,26 @@ export default function ArticleDetailScreen() {
 
   // Compteur de régénération : incrémenté pour varier la phrase locale.
   const [seed, setSeed] = useState(0);
-  const [copied, setCopied] = useState(false);
-  // Description produite par l'IA (null tant qu'on utilise le modèle local).
-  const [aiDescription, setAiDescription] = useState<string | null>(null);
+  // Champ copié à l'instant ("title" | "description" | null).
+  const [copied, setCopied] = useState<"title" | "description" | null>(null);
+  // Annonce produite par l'IA (null tant qu'on utilise le modèle local).
+  const [aiListing, setAiListing] = useState<Listing | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Description locale (templates hors-ligne), recalculée selon le seed.
-  const localDescription = useMemo(
-    () => (article ? generateDescription(article, seed) : ""),
+  // Annonce locale (templates hors-ligne), recalculée selon le seed.
+  const localListing = useMemo(
+    () =>
+      article ? generateListing(article, seed) : { title: "", description: "" },
     [article, seed],
   );
 
-  // Description affichée : IA si disponible, sinon modèle local.
-  const description = aiDescription ?? localDescription;
+  // Annonce affichée : IA si disponible, sinon modèle local.
+  const listing = aiListing ?? localListing;
 
   // Réinitialise l'état "Copié !" après 2 secondes.
   useEffect(() => {
     if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
+    const timer = setTimeout(() => setCopied(null), 2000);
     return () => clearTimeout(timer);
   }, [copied]);
 
@@ -81,13 +83,28 @@ export default function ArticleDetailScreen() {
   const percent = marginPercent(article.purchasePrice, sellPrice);
   const isSold = article.status === "vendu";
 
-  // Copie la description dans le presse-papier.
-  const handleCopy = async () => {
-    await Clipboard.setStringAsync(description);
-    setCopied(true);
+  // Copie le titre ou la description dans le presse-papier.
+  const handleCopy = async (field: "title" | "description") => {
+    await Clipboard.setStringAsync(
+      field === "title" ? listing.title : listing.description,
+    );
+    setCopied(field);
   };
 
-  // Génère la description via l'IA (repli automatique sur le modèle local en cas d'échec).
+  // Passage en "vendu" : on demande le PRIX DE VENTE FINAL pour que les
+  // statistiques (CA, bénéfice, marge) reflètent la réalité.
+  const handleMarkSold = async () => {
+    const price = await promptAmount(
+      "Prix de vente final",
+      `À combien as-tu réellement vendu « ${article.name || article.brand} » ?`,
+      article.targetPrice,
+    );
+    if (price !== null) {
+      markAsSold(article.id, price);
+    }
+  };
+
+  // Génère l'annonce via l'IA (repli automatique sur le modèle local en cas d'échec).
   const handleAi = async () => {
     if (!isAiConfigured()) {
       notify(
@@ -98,8 +115,8 @@ export default function ArticleDetailScreen() {
     }
     try {
       setAiLoading(true);
-      const text = await generateAiDescription(article);
-      setAiDescription(text);
+      const result = await generateAiListing(article);
+      setAiListing(result);
     } catch (e) {
       notify("Génération IA impossible", (e as Error).message);
     } finally {
@@ -220,23 +237,40 @@ export default function ArticleDetailScreen() {
               title="Marquer comme vendu"
               icon="checkmark-circle-outline"
               className="mt-4"
-              onPress={() => markAsSold(article.id)}
+              onPress={handleMarkSold}
             />
           </>
         )}
 
-        {/* Générateur de description Vinted */}
+        {/* Générateur d'annonce Vinted : titre + description */}
         <View className="mb-2 mt-8 flex-row items-center justify-between">
           <Text className="text-sm font-medium uppercase tracking-wide text-muted">
-            Description Vinted
+            Annonce Vinted
           </Text>
           <Text className="text-xs text-muted">
-            {aiDescription ? "✨ Générée par IA" : "Modèle local"}
+            {aiListing ? "✨ Générée par IA" : "Modèle local"}
           </Text>
         </View>
+
+        {/* Titre */}
         <Card>
+          <View className="flex-row items-center justify-between">
+            <Text className="mr-3 flex-1 text-base font-semibold text-ink" selectable>
+              {listing.title}
+            </Text>
+            <Button
+              title={copied === "title" ? "Copié !" : "Copier"}
+              icon={copied === "title" ? "checkmark" : "copy-outline"}
+              variant="ghost"
+              onPress={() => handleCopy("title")}
+            />
+          </View>
+        </Card>
+
+        {/* Description */}
+        <Card className="mt-2">
           <Text className="text-base leading-6 text-ink" selectable>
-            {description}
+            {listing.description}
           </Text>
         </Card>
 
@@ -257,15 +291,15 @@ export default function ArticleDetailScreen() {
             variant="secondary"
             className="mr-2 flex-1"
             onPress={() => {
-              setAiDescription(null);
+              setAiListing(null);
               setSeed((s) => s + 1);
             }}
           />
           <Button
-            title={copied ? "Copié !" : "Copier"}
-            icon={copied ? "checkmark" : "copy-outline"}
+            title={copied === "description" ? "Copié !" : "Copier description"}
+            icon={copied === "description" ? "checkmark" : "copy-outline"}
             className="flex-1"
-            onPress={handleCopy}
+            onPress={() => handleCopy("description")}
           />
         </View>
       </ScrollView>

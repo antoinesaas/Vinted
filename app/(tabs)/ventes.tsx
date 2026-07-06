@@ -15,7 +15,12 @@ import { notify } from "../../utils/alert";
 import { netMargin } from "../../utils/calculations";
 import { exportSalesCsv } from "../../utils/csv";
 import { formatEUR, formatShortDate } from "../../utils/format";
-import { soldArticles, totalLifetimeProfit } from "../../utils/stats";
+import {
+  monthlyBreakdown,
+  soldArticles,
+  totalLifetimeProfit,
+  totalLifetimeRevenue,
+} from "../../utils/stats";
 
 export default function VentesScreen() {
   const { articles } = useStore();
@@ -35,6 +40,13 @@ export default function VentesScreen() {
     () => totalLifetimeProfit(articles),
     [articles],
   );
+  const lifetimeRevenue = useMemo(
+    () => totalLifetimeRevenue(articles),
+    [articles],
+  );
+
+  // Tableau mensuel : CA + bénéfice par mois.
+  const months = useMemo(() => monthlyBreakdown(articles), [articles]);
 
   // Export CSV (téléchargement navigateur).
   const handleExport = async () => {
@@ -45,8 +57,8 @@ export default function VentesScreen() {
       if (!ok) {
         notify("Export indisponible", "Le partage n'est pas disponible sur cet appareil.");
       }
-    } catch {
-      notify("Erreur", "L'export CSV a échoué.");
+    } catch (e) {
+      notify("L'export CSV a échoué", (e as Error).message);
     } finally {
       setExporting(false);
     }
@@ -70,7 +82,7 @@ export default function VentesScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View className="mb-3">
-            {/* Total cumulé depuis le début de l'activité. */}
+            {/* Totaux cumulés depuis le début de l'activité. */}
             <Card className="mb-3">
               <Text className="text-sm font-medium uppercase tracking-wide text-muted">
                 Bénéfice cumulé (depuis le début)
@@ -78,7 +90,70 @@ export default function VentesScreen() {
               <Text className="mt-1 text-4xl font-bold text-ink">
                 {formatEUR(lifetimeProfit)}
               </Text>
+              <Text className="mt-1 text-sm text-muted">
+                Sur {formatEUR(lifetimeRevenue)} de chiffre d'affaires
+              </Text>
             </Card>
+
+            {/* Tableau mensuel : CA + bénéfice. */}
+            {months.length > 0 ? (
+              <Card className="mb-3">
+                <Text className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
+                  CA & bénéfice par mois
+                </Text>
+
+                {/* En-tête du tableau */}
+                <View className="flex-row border-b border-line pb-2">
+                  <Text className="flex-1 text-xs font-semibold uppercase text-muted">
+                    Mois
+                  </Text>
+                  <Text className="w-12 text-right text-xs font-semibold uppercase text-muted">
+                    Ventes
+                  </Text>
+                  <Text className="w-20 text-right text-xs font-semibold uppercase text-muted">
+                    CA
+                  </Text>
+                  <Text className="w-20 text-right text-xs font-semibold uppercase text-muted">
+                    Bénéfice
+                  </Text>
+                </View>
+
+                {/* Lignes par mois */}
+                {months.map((m) => (
+                  <View
+                    key={m.key}
+                    className="flex-row items-center border-b border-line py-2"
+                  >
+                    <Text className="flex-1 text-sm text-ink" numberOfLines={1}>
+                      {m.label}
+                    </Text>
+                    <Text className="w-12 text-right text-sm text-muted">
+                      {m.count}
+                    </Text>
+                    <Text className="w-20 text-right text-sm text-ink">
+                      {formatEUR(m.revenue)}
+                    </Text>
+                    <Text className="w-20 text-right text-sm font-semibold text-ink">
+                      {formatEUR(m.profit)}
+                    </Text>
+                  </View>
+                ))}
+
+                {/* Ligne total */}
+                <View className="flex-row items-center pt-2">
+                  <Text className="flex-1 text-sm font-bold text-ink">Total</Text>
+                  <Text className="w-12 text-right text-sm font-semibold text-muted">
+                    {sales.length}
+                  </Text>
+                  <Text className="w-20 text-right text-sm font-bold text-ink">
+                    {formatEUR(lifetimeRevenue)}
+                  </Text>
+                  <Text className="w-20 text-right text-sm font-bold text-ink">
+                    {formatEUR(lifetimeProfit)}
+                  </Text>
+                </View>
+              </Card>
+            ) : null}
 
             {sales.length > 0 ? (
               <Button

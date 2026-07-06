@@ -48,11 +48,15 @@ async function callFunction<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
-/** Génère une description Vinted via l'IA (à partir des attributs du produit). */
-export async function generateAiDescription(
-  article: Article,
-): Promise<string> {
-  const { description } = await callFunction<{ description: string }>({
+/** Annonce Vinted générée : titre + description. */
+export interface Listing {
+  title: string;
+  description: string;
+}
+
+/** Génère un titre + une description Vinted via l'IA. */
+export async function generateAiListing(article: Article): Promise<Listing> {
+  return callFunction<Listing>({
     action: "generate_description",
     article: {
       name: article.name,
@@ -64,7 +68,6 @@ export async function generateAiDescription(
       targetPrice: article.targetPrice,
     },
   });
-  return description;
 }
 
 /** Résultat de l'analyse d'une capture d'écran d'annonce. */

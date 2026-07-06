@@ -1,45 +1,43 @@
 // ============================================================
-// Générateur de description Vinted.
-// 5 templates de phrases qui alternent pour varier les annonces.
+// Générateur local d'annonce Vinted (hors-ligne) : titre + description.
+// Description volontairement SIMPLE (factuelle, sans superlatifs)
+// + un maximum de hashtags pertinents.
 // ============================================================
 
 import { CONDITION_LABELS, TYPE_WORDS } from "../constants/labels";
 import type { Article } from "../types";
 
-/** Mots d'ambiance choisis selon le type de pièce (pour varier le style). */
-const STYLE_WORDS: Record<Article["type"], string[]> = {
-  tshirt: ["streetwear", "vintage", "décontracté", "y2k"],
-  short: ["estival", "sportif", "décontracté", "streetwear"],
-  veste: ["vintage", "streetwear", "intemporel", "casual"],
-  autre: ["tendance", "unique", "vintage", "streetwear"],
-};
+/** Annonce générée : titre + description (même forme que l'IA). */
+export interface GeneratedListing {
+  title: string;
+  description: string;
+}
 
 /**
- * Les 5 templates de phrase. Chacun reçoit le contexte de l'article
- * (marque, mot du type, taille, état, mot de style) et renvoie une phrase.
+ * 5 phrases d'accroche TRÈS simples qui alternent (selon le seed)
+ * pour ne pas publier toujours exactement la même annonce.
  */
-type PhraseContext = {
-  brand: string;
-  typeWord: string;
-  size: string;
-  condition: string;
-  style: string;
-};
-
-const PHRASE_TEMPLATES: Array<(c: PhraseContext) => string> = [
+const SIMPLE_PHRASES: Array<
+  (c: { brand: string; typeWord: string; size: string; condition: string }) => string
+> = [
   (c) =>
-    `Superbe ${c.typeWord} ${c.brand}, un indispensable pour un look ${c.style}. En état ${c.condition}, prêt à être porté.`,
+    `${cap(c.typeWord)} ${c.brand} taille ${c.size}, état ${c.condition}.`,
   (c) =>
-    `${c.brand} au style intemporel : ce ${c.typeWord} taille ${c.size} s'accorde avec tout et reste en état ${c.condition}.`,
+    `${c.brand} — ${c.typeWord} en taille ${c.size}. État ${c.condition}.`,
   (c) =>
-    `Pièce ${c.style} signée ${c.brand}. ${c.typeWord.charAt(0).toUpperCase() + c.typeWord.slice(1)} très agréable à porter, condition ${c.condition}, idéal pour compléter ta garde-robe.`,
+    `${cap(c.typeWord)} ${c.brand}, taille ${c.size}. Très propre, état ${c.condition}.`,
   (c) =>
-    `Coup de cœur : ${c.typeWord} ${c.brand} en taille ${c.size}. Qualité au rendez-vous, état ${c.condition}, parfait pour un style qui sort du lot.`,
+    `${cap(c.typeWord)} de la marque ${c.brand}, taille ${c.size}, état ${c.condition}. Envoi rapide.`,
   (c) =>
-    `Ne passe pas à côté de ce ${c.typeWord} ${c.brand} ! Look ${c.style} garanti, pièce en état ${c.condition}, taille ${c.size}.`,
+    `${c.brand} ${c.typeWord}, taille ${c.size}, état ${c.condition}. N'hésite pas à faire une offre.`,
 ];
 
-/** Nettoie une marque pour en faire un hashtag (minuscule, sans espace/accent). */
+/** Majuscule sur la première lettre. */
+function cap(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** Nettoie une valeur pour en faire un hashtag (minuscule, sans espace/accent). */
 function toHashtag(value: string): string {
   return value
     .normalize("NFD")
@@ -48,63 +46,95 @@ function toHashtag(value: string): string {
     .replace(/[^a-z0-9]/g, ""); // ne garde que lettres/chiffres
 }
 
+/** Hashtags liés à l'état de la pièce. */
+const CONDITION_TAGS: Record<Article["condition"], string[]> = {
+  bon: ["bonetat"],
+  tres_bon: ["tresbonetat", "commeneuf"],
+  parfait: ["neuf", "etatparfait"],
+};
+
+/** Hashtags de style selon le type de pièce. */
+const STYLE_TAGS: Record<Article["type"], string[]> = {
+  tshirt: ["streetwear", "y2k", "casual", "haut"],
+  short: ["ete", "sport", "casual", "summer"],
+  veste: ["streetwear", "vintage", "outerwear", "jacket"],
+  autre: ["streetwear", "vintage", "casual"],
+};
+
+/** Base générique toujours présente (visibilité maximale). */
+const BASE_TAGS = [
+  "vinted",
+  "mode",
+  "secondemain",
+  "occasion",
+  "friperie",
+  "vintage",
+  "fashion",
+  "style",
+  "look",
+  "ootd",
+  "tendance",
+  "petitprix",
+  "bonplan",
+  "depotvente",
+];
+
+/** Construit la liste complète des hashtags (dédupliqués, ~20). */
+function buildHashtags(article: Article): string {
+  const typeWord = TYPE_WORDS[article.type];
+  const tags = [
+    toHashtag(article.brand),
+    toHashtag(typeWord),
+    toHashtag(article.size) ? `taille${toHashtag(article.size)}` : "",
+    toHashtag(article.size),
+    ...CONDITION_TAGS[article.condition],
+    ...STYLE_TAGS[article.type],
+    ...BASE_TAGS,
+  ].filter(Boolean);
+
+  // Déduplication en conservant l'ordre.
+  const unique = [...new Set(tags)];
+  return unique.map((t) => `#${t}`).join(" ");
+}
+
 /**
- * Génère une description Vinted complète pour un article.
+ * Génère une annonce Vinted complète (titre + description simple).
  *
  * @param article  L'article concerné.
- * @param seed     Indice de template optionnel (0-4). Si absent, choix aléatoire.
- *                 Permet de "régénérer" en faisant varier la phrase.
+ * @param seed     Indice optionnel pour faire varier la phrase d'accroche.
  */
-export function generateDescription(article: Article, seed?: number): string {
+export function generateListing(
+  article: Article,
+  seed?: number,
+): GeneratedListing {
   const typeWord = TYPE_WORDS[article.type];
   const condition = CONDITION_LABELS[article.condition].toLowerCase();
-  const styles = STYLE_WORDS[article.type];
+  const brand = article.brand || "Sans marque";
+  const size = article.size || "unique";
 
-  // Sélection du template et du mot de style (aléatoire ou piloté par `seed`).
-  const templateIndex =
+  // Titre court et efficace.
+  const title = `${brand} ${typeWord} ${size} — état ${condition}`;
+
+  // Phrase d'accroche simple (choisie par le seed ou au hasard).
+  const index =
     seed !== undefined
-      ? ((seed % PHRASE_TEMPLATES.length) + PHRASE_TEMPLATES.length) %
-        PHRASE_TEMPLATES.length
-      : Math.floor(Math.random() * PHRASE_TEMPLATES.length);
-  const style =
-    styles[
-      seed !== undefined
-        ? seed % styles.length
-        : Math.floor(Math.random() * styles.length)
-    ] ?? "tendance";
-
-  const phrase = PHRASE_TEMPLATES[templateIndex]!({
-    brand: article.brand || "Sans marque",
+      ? ((seed % SIMPLE_PHRASES.length) + SIMPLE_PHRASES.length) %
+        SIMPLE_PHRASES.length
+      : Math.floor(Math.random() * SIMPLE_PHRASES.length);
+  const phrase = SIMPLE_PHRASES[index]!({
+    brand,
     typeWord,
-    size: article.size || "unique",
+    size,
     condition,
-    style,
   });
 
-  // Titre : [Marque] [type] [taille] — état [état]
-  const title = `${article.brand || "Article"} ${typeWord} ${article.size} — état ${condition}`;
-
-  // Hashtags dynamiques.
-  const hashtags = [
-    "#vintage",
-    `#${toHashtag(article.brand) || "mode"}`,
-    "#streetwear",
-    `#${toHashtag(typeWord)}`,
-    `#${toHashtag(article.size) || "taille"}`,
-    "#vinted",
-    "#secondemain",
-    "#mode",
-    "#y2k",
-    "#tendance",
-  ].join(" ");
-
-  return [
-    title,
-    "",
+  const description = [
     phrase,
     "",
     "Vendu sans retour. Questions bienvenues 👍",
     "",
-    hashtags,
+    buildHashtags(article),
   ].join("\n");
+
+  return { title, description };
 }

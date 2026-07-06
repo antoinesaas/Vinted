@@ -102,6 +102,55 @@ export function weeklyProfit(
   return points;
 }
 
+/** Ligne du tableau mensuel : CA et bénéfice d'un mois donné. */
+export interface MonthlyRow {
+  /** Clé de tri (ex : "2026-07"). */
+  key: string;
+  /** Libellé affiché (ex : "Juillet 2026"). */
+  label: string;
+  /** Nombre de ventes du mois. */
+  count: number;
+  /** Chiffre d'affaires du mois (€). */
+  revenue: number;
+  /** Bénéfice net du mois (€). */
+  profit: number;
+}
+
+/**
+ * Tableau récapitulatif par mois (CA + bénéfice), du plus récent au
+ * plus ancien. Ne contient que les mois ayant au moins une vente.
+ */
+export function monthlyBreakdown(articles: Article[]): MonthlyRow[] {
+  const rows = new Map<string, MonthlyRow>();
+
+  for (const a of soldArticles(articles)) {
+    const d = new Date(a.soldAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    let row = rows.get(key);
+    if (!row) {
+      const label = d.toLocaleDateString("fr-FR", {
+        month: "long",
+        year: "numeric",
+      });
+      row = {
+        key,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        count: 0,
+        revenue: 0,
+        profit: 0,
+      };
+      rows.set(key, row);
+    }
+
+    row.count += 1;
+    row.revenue += a.soldPrice;
+    row.profit += netMargin(a.purchasePrice, a.soldPrice);
+  }
+
+  return [...rows.values()].sort((x, y) => y.key.localeCompare(x.key));
+}
+
 /** Total cumulé du bénéfice net depuis le début de l'activité. */
 export function totalLifetimeProfit(articles: Article[]): number {
   return soldArticles(articles).reduce(

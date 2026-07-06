@@ -48,37 +48,40 @@ async function callOpenAI(messages, temperature) {
   return JSON.parse(content);
 }
 
-// ---- Action 1 : génération de description Vinted ----------------
+// ---- Action 1 : génération de titre + description Vinted --------
 async function generateDescription(article) {
   const system =
     "Tu es un vendeur expert de vêtements d'occasion sur Vinted. " +
-    "Tu écris des descriptions courtes, authentiques et vendeuses en français. " +
+    "Tu écris des annonces SIMPLES et efficaces en français. " +
     "Tu réponds STRICTEMENT en JSON.";
 
   const user =
-    "Génère une description Vinted pour ce produit :\n" +
+    "Génère une annonce Vinted pour ce produit :\n" +
     JSON.stringify(article) +
-    "\n\nRéponds en JSON avec une seule clé \"description\" (chaîne unique) " +
-    "structurée EXACTEMENT ainsi :\n" +
-    "- Ligne 1 : \"[Marque] [type] taille [taille] — état [état]\"\n" +
-    "- une ligne vide\n" +
-    "- 1 à 2 phrases vendeuses, naturelles et VARIÉES, adaptées à la marque, " +
-    "au type et à l'état\n" +
-    "- une ligne vide\n" +
-    "- exactement : \"Vendu sans retour. Questions bienvenues 👍\"\n" +
-    "- une ligne vide\n" +
-    "- 8 à 12 hashtags PERTINENTS déduits du produit (marque, type, style " +
-    "vintage/streetwear/y2k selon le cas, taille), en minuscule, sans accent, " +
-    "séparés par des espaces, chacun commençant par #.";
+    '\n\nRéponds en JSON avec DEUX clés :\n' +
+    '- "title" : le titre de l\'annonce, court et efficace ' +
+    '(format : "Marque type taille — état", ex : "Nike t-shirt M — très bon état")\n' +
+    '- "description" : structurée EXACTEMENT ainsi :\n' +
+    "  * 1 à 2 phrases TRÈS SIMPLES et factuelles (marque, type, taille, " +
+    "état — pas de superlatifs, pas de storytelling, style direct)\n" +
+    "  * une ligne vide\n" +
+    '  * exactement : "Vendu sans retour. Questions bienvenues 👍"\n' +
+    "  * une ligne vide\n" +
+    "  * 18 à 25 hashtags pertinents (marque, type, taille, état, style " +
+    "vintage/streetwear/y2k/casual selon le cas, mots génériques : vinted, " +
+    "mode, secondemain, occasion, friperie, fashion, look, style, ootd, " +
+    "tendance), en minuscule, sans accent, séparés par des espaces, " +
+    "chacun commençant par #.";
 
   const result = await callOpenAI(
     [
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    0.85,
+    0.7,
   );
   return {
+    title: typeof result.title === "string" ? result.title : "",
     description:
       typeof result.description === "string" ? result.description : "",
   };
@@ -233,30 +236,43 @@ function median(values) {
 /** Estimation de repli par l'IA (utilisée si la recherche Vinted échoue). */
 async function aiFallbackEstimate(brand, typeWord, size, condition) {
   const system =
-    "Tu es un expert de la revente de vêtements d'occasion sur Vinted. " +
-    "Tu estimes un prix de revente réaliste. Tu réponds STRICTEMENT en JSON.";
+    "Tu es un expert de la revente de vêtements d'occasion sur Vinted France. " +
+    "Tu connais les prix RÉELLEMENT PRATIQUÉS sur la plateforme (les articles " +
+    "s'y vendent bien moins cher qu'en boutique). Tu estimes des prix de " +
+    "revente RÉALISTES et PRUDENTS. Tu réponds STRICTEMENT en JSON.";
   const user =
-    `Estime le prix de revente réaliste (en euros, marché français) pour : ` +
-    `${brand} ${typeWord} taille ${size}, état ${condition}. ` +
-    'Réponds en JSON avec une seule clé "price" (nombre, prix moyen réaliste).';
+    `Estime le prix de revente réaliste sur Vinted France pour : ` +
+    `${brand} ${typeWord} taille ${size}, état ${condition}.\n\n` +
+    "Repères des prix réellement pratiqués sur Vinted (à ajuster selon la pièce) :\n" +
+    "- Fast fashion (Shein, Primark, H&M, Zara, Kiabi...) : 3-12 €\n" +
+    "- Marques sport/mid (Nike, Adidas, Puma, Levi's, Jack&Jones...) : t-shirt 8-18 €, short 8-20 €, veste 15-40 €\n" +
+    "- Marques premium (Ralph Lauren, Tommy Hilfiger, Lacoste, Carhartt...) : t-shirt 15-30 €, veste 30-70 €\n" +
+    "- Pièces vintage/rares recherchées : peuvent dépasser ces fourchettes\n" +
+    "Ajustements : état \"bon\" -20 à -30 % ; état \"parfait\"/neuf +20 à +30 % ; " +
+    "reste PRUDENT : sur Vinted les acheteurs négocient et les prix affichés " +
+    "sont souvent au-dessus des prix de vente réels.\n\n" +
+    'Réponds en JSON avec 3 clés numériques : "price" (prix de vente réaliste), ' +
+    '"low" (bas de fourchette), "high" (haut de fourchette).';
 
   const result = await callOpenAI(
     [
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    0.3,
+    0.2,
   );
   const price = typeof result.price === "number" ? result.price : null;
+  const low = typeof result.low === "number" ? result.low : price;
+  const high = typeof result.high === "number" ? result.high : price;
   return {
     averagePrice: price,
     medianPrice: price,
-    lowPrice: price,
-    highPrice: price,
+    lowPrice: low,
+    highPrice: high,
     sampleSize: 0,
     currency: "EUR",
     source: "ai_estimate",
-    note: "Recherche Vinted indisponible : estimation IA approximative, sans annonces comparables réelles.",
+    note: "Recherche Vinted indisponible : estimation IA calée sur les prix réellement pratiqués (approximative).",
   };
 }
 
