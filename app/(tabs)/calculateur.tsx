@@ -223,9 +223,9 @@ export default function CalculateurScreen() {
         material,
         size,
         condition,
-        // Coût d'achat RÉEL (prix affiché + frais acheteur) PROPOSÉ :
-        // l'écran d'ajout demande de confirmer le coût réellement payé.
-        purchasePrice: purchase > 0 ? String(purchase).replace(".", ",") : "",
+        // Prix AFFICHÉ (pas le coût total) : l'écran d'ajout calcule lui-même
+        // les frais acheteur, pour éviter de les compter deux fois.
+        purchasePrice: purchaseStr,
         photoUri: screenshotUri ?? "",
       },
     });

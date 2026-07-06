@@ -361,9 +361,10 @@ async function estimateResalePrice({ brand, typeWord, size, condition }) {
     };
   } catch (err) {
     // Vinted a bloqué/échoué (anti-bot, indisponibilité...) : repli IA.
-    const fallback = await aiFallbackEstimate(brand, typeWord, size, condition);
-    fallback.note = `${(err && err.message) || "Recherche Vinted indisponible"} — ${fallback.note}`;
-    return fallback;
+    // Le détail technique reste dans les logs serveur, pas dans la réponse
+    // affichée à l'utilisateur.
+    console.error("[estimate_resale_price] recherche Vinted échouée :", err);
+    return await aiFallbackEstimate(brand, typeWord, size, condition);
   }
 }
 

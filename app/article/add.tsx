@@ -21,12 +21,17 @@ import {
   SegmentedControl,
   type SegmentOption,
 } from "../../components/SegmentedControl";
+import { BUYER_PROTECTION_FEE, BUYER_SHIPPING_FEE } from "../../constants/config";
 import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleCondition, ArticleType } from "../../types";
 import { notify } from "../../utils/alert";
-import { netMargin, recommendedPrice } from "../../utils/calculations";
+import {
+  netMargin,
+  recommendedPrice,
+  totalPurchaseCost,
+} from "../../utils/calculations";
 import { formatEUR, parseAmount } from "../../utils/format";
 
 // Options des sélecteurs (dérivées des libellés).
@@ -84,16 +89,22 @@ export default function AddArticleScreen() {
   const [size, setSize] = useState(params.size ?? "");
   const [condition, setCondition] = useState<ArticleCondition>(initialCondition);
   const [purchaseStr, setPurchaseStr] = useState(initialPurchase);
-  // Prix de vente conseillé pré-calculé si un prix d'achat est fourni.
+  // Prix de vente conseillé pré-calculé si un prix d'achat est fourni
+  // (basé sur le coût réel : prix affiché + frais acheteur).
   const [targetStr, setTargetStr] = useState(() => {
-    const p = parseAmount(initialPurchase);
+    const p = totalPurchaseCost(parseAmount(initialPurchase));
     return p > 0 ? recommendedPrice(p).toFixed(2).replace(".", ",") : "";
   });
   // Vrai dès que l'utilisateur modifie manuellement le prix de vente
   // (on cesse alors de le remplir automatiquement).
   const [targetTouched, setTargetTouched] = useState(false);
 
-  const purchase = parseAmount(purchaseStr);
+  // `purchaseStr` est le PRIX AFFICHÉ de l'annonce. Le coût réel payé par
+  // l'acheteur inclut en plus la protection acheteur (~2 €) et la
+  // livraison (~3,5 €) : c'est ce coût total qui sert de base au calcul de
+  // marge et qui est sauvegardé comme prix d'achat de l'article.
+  const displayedPrice = parseAmount(purchaseStr);
+  const purchase = totalPurchaseCost(displayedPrice);
   const target = parseAmount(targetStr);
   const margin = netMargin(purchase, target);
 
@@ -103,12 +114,13 @@ export default function AddArticleScreen() {
     if (value !== "autre") setCustomType("");
   };
 
-  // À chaque changement du prix d'achat, on propose un prix de vente
-  // conseillé (× 2,2) tant que l'utilisateur n'a rien saisi manuellement.
+  // À chaque changement du prix affiché, on propose un prix de vente
+  // conseillé (× 2,2 sur le coût réel) tant que l'utilisateur n'a rien
+  // saisi manuellement.
   const handlePurchaseChange = (value: string) => {
     setPurchaseStr(value);
     if (!targetTouched) {
-      const p = parseAmount(value);
+      const p = totalPurchaseCost(parseAmount(value));
       setTargetStr(p > 0 ? recommendedPrice(p).toFixed(2).replace(".", ",") : "");
     }
   };
@@ -304,7 +316,7 @@ export default function AddArticleScreen() {
           {/* Prix */}
           <Card className="mt-5">
             <Input
-              label="Prix d'achat"
+              label="Prix affiché de l'annonce"
               placeholder="0,00"
               keyboardType="decimal-pad"
               value={purchaseStr}
@@ -313,8 +325,15 @@ export default function AddArticleScreen() {
             />
             {fromCalculator ? (
               <Text className="mt-2 text-xs text-muted">
-                ✓ Prix pré-rempli depuis le calculateur. Confirme le coût
-                d'achat réellement payé pour des statistiques justes.
+                ✓ Prix pré-rempli depuis le calculateur. Confirme le prix
+                affiché réellement payé pour des statistiques justes.
+              </Text>
+            ) : null}
+            {displayedPrice > 0 ? (
+              <Text className="mt-2 text-xs text-muted">
+                {formatEUR(displayedPrice)} + protection ({formatEUR(BUYER_PROTECTION_FEE)}) +
+                livraison ({formatEUR(BUYER_SHIPPING_FEE)}) = coût réel{" "}
+                <Text className="font-semibold text-ink">{formatEUR(purchase)}</Text>
               </Text>
             ) : null}
             <Input
