@@ -9,8 +9,9 @@
 //   { action: "parse_screenshot", imageBase64, mimeType }
 //       -> { title, brand, size, color, material, condition, type, price, currency }
 //   { action: "estimate_resale_price", brand, typeWord, size, condition }
-//       -> { averagePrice, medianPrice, lowPrice, highPrice, sampleSize,
-//            currency, source: "vinted_search" | "ai_estimate", note }
+//       -> { averagePrice, medianPrice, lowPrice, highPrice, listingPrice,
+//            sampleSize, currency, source: "vinted_search" | "ai_estimate", note }
+//          (listingPrice = averagePrice + marge de négociation ~5€)
 //
 // Aucune dépendance : utilise fetch natif de Node 18+.
 // ============================================================
@@ -258,6 +259,23 @@ function median(values) {
     : sorted[mid];
 }
 
+// Marge de négociation : sur Vinted, les acheteurs négocient quasi
+// systématiquement à la baisse. On ajoute ce montant au prix moyen estimé
+// pour obtenir le prix à AFFICHER sur l'annonce (afin de négocier depuis
+// un prix plus haut tout en visant le prix de vente réel estimé).
+const NEGOTIATION_BUFFER = 5;
+
+/** Ajoute le prix d'affichage conseillé (moyenne + marge de négociation). */
+function withListingPrice(result) {
+  return {
+    ...result,
+    listingPrice:
+      result.averagePrice != null
+        ? Math.round((result.averagePrice + NEGOTIATION_BUFFER) * 100) / 100
+        : null,
+  };
+}
+
 /** Estimation de repli par l'IA (utilisée si la recherche Vinted échoue). */
 async function aiFallbackEstimate(brand, typeWord, size, condition) {
   const system =
@@ -271,8 +289,13 @@ async function aiFallbackEstimate(brand, typeWord, size, condition) {
     "Repères des prix réellement pratiqués sur Vinted (à ajuster selon la pièce) :\n" +
     "- Fast fashion (Shein, Primark, H&M, Zara, Kiabi...) : 3-12 €\n" +
     "- Marques sport/mid (Nike, Adidas, Puma, Levi's, Jack&Jones...) : t-shirt 8-18 €, short 8-20 €, veste 15-40 €\n" +
-    "- Marques premium (Ralph Lauren, Tommy Hilfiger, Lacoste, Carhartt...) : t-shirt 15-30 €, veste 30-70 €\n" +
-    "- Pièces vintage/rares recherchées : peuvent dépasser ces fourchettes\n" +
+    "- Marques premium classiques (Ralph Lauren, Tommy Hilfiger, Lacoste...) : t-shirt 15-30 €, veste 30-70 €\n" +
+    "- Marques streetwear/hype recherchées (Stussy, Supreme, Bape, Palace, " +
+    "Carhartt WIP, Kith, Aime Leon Dore...) : t-shirt 20-45 €, short 20-40 €, " +
+    "veste/hoodie 40-90 € — ces marques se revendent BEAUCOUP plus cher que " +
+    "les marques sport/mid classiques, ne les sous-estime pas\n" +
+    "- Pièces vintage/rares/collabs recherchées : peuvent dépasser largement " +
+    "ces fourchettes\n" +
     "Ajustements : état \"bon\" -20 à -30 % ; état \"parfait\"/neuf +20 à +30 % ; " +
     "reste PRUDENT : sur Vinted les acheteurs négocient et les prix affichés " +
     "sont souvent au-dessus des prix de vente réels.\n\n" +
@@ -284,12 +307,12 @@ async function aiFallbackEstimate(brand, typeWord, size, condition) {
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    0.2,
+    0,
   );
   const price = typeof result.price === "number" ? result.price : null;
   const low = typeof result.low === "number" ? result.low : price;
   const high = typeof result.high === "number" ? result.high : price;
-  return {
+  return withListingPrice({
     averagePrice: price,
     medianPrice: price,
     lowPrice: low,
@@ -297,8 +320,8 @@ async function aiFallbackEstimate(brand, typeWord, size, condition) {
     sampleSize: 0,
     currency: "EUR",
     source: "ai_estimate",
-    note: "Recherche Vinted indisponible : estimation IA calée sur les prix réellement pratiqués (approximative).",
-  };
+    note: "Recherche Vinted indisponible : estimation IA calée sur les prix réellement pratiqués (approximative, peut varier légèrement d'un essai à l'autre).",
+  });
 }
 
 async function estimateResalePrice({ brand, typeWord, size, condition }) {
@@ -349,7 +372,7 @@ async function estimateResalePrice({ brand, typeWord, size, condition }) {
     const prices = sample.map((it) => it.price);
     const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
 
-    return {
+    return withListingPrice({
       averagePrice: Math.round(avg * 100) / 100,
       medianPrice: Math.round(median(prices) * 100) / 100,
       lowPrice: Math.round(Math.min(...prices) * 100) / 100,
@@ -358,7 +381,7 @@ async function estimateResalePrice({ brand, typeWord, size, condition }) {
       currency: "EUR",
       source: "vinted_search",
       note: `Basé sur ${prices.length} annonce(s) comparable(s) actuellement en ligne sur Vinted.`,
-    };
+    });
   } catch (err) {
     // Vinted a bloqué/échoué (anti-bot, indisponibilité...) : repli IA.
     // Le détail technique reste dans les logs serveur, pas dans la réponse

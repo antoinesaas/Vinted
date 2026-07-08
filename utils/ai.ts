@@ -106,10 +106,16 @@ export async function parseScreenshot(
 
 /** Résultat de l'estimation du prix de revente réel. */
 export interface ResalePriceResult {
+  /** Prix de vente moyen réaliste (ce que tu peux espérer RECEVOIR). */
   averagePrice: number | null;
   medianPrice: number | null;
   lowPrice: number | null;
   highPrice: number | null;
+  /**
+   * Prix à AFFICHER sur l'annonce : moyenne + marge de négociation (~5 €),
+   * pour négocier depuis un prix plus haut tout en visant `averagePrice`.
+   */
+  listingPrice: number | null;
   /** Nombre d'annonces comparables utilisées (0 si estimation IA de repli). */
   sampleSize: number;
   currency: string;

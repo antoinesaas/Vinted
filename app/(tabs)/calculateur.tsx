@@ -370,19 +370,42 @@ export default function CalculateurScreen() {
                       size={16}
                       color={resale.source === "vinted_search" ? colors.text : colors.textMuted}
                     />
-                    <Text className="ml-2 flex-1 text-sm font-medium text-ink">
+                    <Text className="ml-2 flex-1 text-sm font-semibold text-ink">
                       {resale.source === "vinted_search"
-                        ? `Moyenne réelle : ${formatEUR(resale.averagePrice ?? 0)}`
-                        : `Estimation IA : ${formatEUR(resale.averagePrice ?? 0)}`}
+                        ? "Moyenne d'annonces réelles"
+                        : "Estimation IA (repli)"}
                     </Text>
                   </View>
-                  <Text className="mt-1 text-xs text-muted">{resale.note}</Text>
+
+                  {/* Deux prix bien distincts, pour éviter toute confusion. */}
+                  <View className="mt-2 flex-row items-center justify-between">
+                    <Text className="text-sm text-muted">
+                      Prix de vente réaliste{"\n"}(ce que tu devrais recevoir)
+                    </Text>
+                    <Text className="text-lg font-bold text-ink">
+                      {formatEUR(resale.averagePrice ?? 0)}
+                    </Text>
+                  </View>
+                  <View className="mt-2 flex-row items-center justify-between border-t border-line pt-2">
+                    <Text className="text-sm text-muted">
+                      Prix à afficher sur l'annonce{"\n"}(+{formatEUR(5)} marge de négociation)
+                    </Text>
+                    <Text className="text-lg font-bold text-ink">
+                      {formatEUR(resale.listingPrice ?? 0)}
+                    </Text>
+                  </View>
+
                   {resale.source === "vinted_search" && resale.lowPrice != null ? (
-                    <Text className="mt-1 text-xs text-muted">
-                      Fourchette : {formatEUR(resale.lowPrice)} – {formatEUR(resale.highPrice ?? 0)}
+                    <Text className="mt-2 border-t border-line pt-2 text-xs text-muted">
+                      Basé sur {resale.sampleSize} annonce(s) comparable(s) · fourchette{" "}
+                      {formatEUR(resale.lowPrice)} – {formatEUR(resale.highPrice ?? 0)}
                       {"  ·  "}médiane {formatEUR(resale.medianPrice ?? 0)}
                     </Text>
-                  ) : null}
+                  ) : (
+                    <Text className="mt-2 border-t border-line pt-2 text-xs text-muted">
+                      {resale.note}
+                    </Text>
+                  )}
                 </View>
               ) : null}
 
@@ -397,15 +420,22 @@ export default function CalculateurScreen() {
               />
             </Card>
 
-            {/* Résultats */}
+            {/* Résultats : détail complet de tous les frais déduits. */}
             <Card className="mt-3">
-              <ResultRow label="Marge brute" value={formatEUR(result.gross)} />
-              <View className="my-2 h-px bg-line" />
+              <ResultRow label="Prix de vente" value={formatEUR(sell)} className="mb-1.5" />
               <ResultRow
-                label={`Marge nette (− ${formatEUR(SACHET_FEE)} sachet)`}
-                value={formatEUR(result.net)}
-                strong
+                label="− Prix affiché (achat)"
+                value={formatEUR(displayedPrice)}
+                className="mb-1.5"
               />
+              <ResultRow
+                label="− Frais acheteur (protection + livraison)"
+                value={formatEUR(BUYER_FEES_TOTAL)}
+                className="mb-1.5"
+              />
+              <ResultRow label="− Frais de sachet (envoi)" value={formatEUR(SACHET_FEE)} />
+              <View className="my-2 h-px bg-line" />
+              <ResultRow label="Marge nette" value={formatEUR(result.net)} strong />
               <View className="my-2 h-px bg-line" />
               <ResultRow
                 label="Multiplicateur du coût réel"
@@ -476,13 +506,15 @@ function ResultRow({
   label,
   value,
   strong = false,
+  className = "",
 }: {
   label: string;
   value: string;
   strong?: boolean;
+  className?: string;
 }) {
   return (
-    <View className="flex-row items-center justify-between">
+    <View className={`flex-row items-center justify-between ${className}`}>
       <Text
         className={`text-base ${strong ? "font-semibold text-ink" : "text-muted"}`}
       >

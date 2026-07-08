@@ -21,13 +21,18 @@ import {
   SegmentedControl,
   type SegmentOption,
 } from "../../components/SegmentedControl";
-import { BUYER_PROTECTION_FEE, BUYER_SHIPPING_FEE } from "../../constants/config";
+import {
+  BUYER_PROTECTION_FEE,
+  BUYER_SHIPPING_FEE,
+  SACHET_FEE,
+} from "../../constants/config";
 import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleCondition, ArticleType } from "../../types";
 import { notify } from "../../utils/alert";
 import {
+  BUYER_FEES_TOTAL,
   netMargin,
   recommendedPrice,
   totalPurchaseCost,
@@ -362,13 +367,32 @@ export default function AddArticleScreen() {
               </Pressable>
             ) : null}
 
-            {/* Marge nette calculée en direct. */}
+            {/* Marge nette calculée en direct : détail complet des frais. */}
             {purchase > 0 && target > 0 ? (
-              <View className="mt-4 flex-row items-center justify-between border-t border-line pt-3">
-                <Text className="text-base text-muted">Marge nette estimée</Text>
-                <Text className="text-xl font-bold text-ink">
-                  {formatEUR(margin)}
-                </Text>
+              <View className="mt-4 border-t border-line pt-3">
+                <MarginBreakdownRow label="Prix de vente" value={formatEUR(target)} />
+                <MarginBreakdownRow
+                  label="− Prix affiché (achat)"
+                  value={formatEUR(displayedPrice)}
+                />
+                <MarginBreakdownRow
+                  label="− Frais acheteur (protection + livraison)"
+                  value={formatEUR(BUYER_FEES_TOTAL)}
+                />
+                <MarginBreakdownRow
+                  label="− Frais de sachet (envoi)"
+                  value={formatEUR(SACHET_FEE)}
+                  className="mb-0"
+                />
+                <View className="my-2 h-px bg-line" />
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-base font-semibold text-ink">
+                    Marge nette estimée
+                  </Text>
+                  <Text className="text-xl font-bold text-ink">
+                    {formatEUR(margin)}
+                  </Text>
+                </View>
               </View>
             ) : null}
           </Card>
@@ -383,5 +407,23 @@ export default function AddArticleScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
+  );
+}
+
+// Ligne "libellé — valeur" du détail de marge (frais déduits un par un).
+function MarginBreakdownRow({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <View className={`mb-1.5 flex-row items-center justify-between ${className}`}>
+      <Text className="text-sm text-muted">{label}</Text>
+      <Text className="text-base font-medium text-ink">{value}</Text>
+    </View>
   );
 }
