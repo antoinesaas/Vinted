@@ -1,7 +1,8 @@
 // ÉCRAN 1 — DASHBOARD : indicateurs clés du mois + graphique hebdomadaire.
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { BarChart } from "../../components/BarChart";
 import { Card } from "../../components/Card";
@@ -9,9 +10,14 @@ import { Fab } from "../../components/Fab";
 import { Header } from "../../components/Header";
 import { Screen } from "../../components/Screen";
 import { StatCard } from "../../components/StatCard";
+import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import { formatEUR, formatPercent } from "../../utils/format";
-import { computeMonthlyStats, weeklyProfit } from "../../utils/stats";
+import {
+  articlesToRelist,
+  computeMonthlyStats,
+  weeklyProfit,
+} from "../../utils/stats";
 
 // Nom du mois courant (ex : "Juillet 2026").
 function currentMonthLabel(): string {
@@ -29,6 +35,7 @@ export default function DashboardScreen() {
   // Recalcul mémoïsé à chaque changement d'articles.
   const stats = useMemo(() => computeMonthlyStats(articles), [articles]);
   const weekly = useMemo(() => weeklyProfit(articles, 6), [articles]);
+  const toRelist = useMemo(() => articlesToRelist(articles), [articles]);
 
   return (
     <Screen>
@@ -38,6 +45,25 @@ export default function DashboardScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Alerte : pièces en ligne depuis plus de 3 semaines à republier. */}
+        {toRelist.length > 0 ? (
+          <Pressable
+            onPress={() => router.push("/stock?filter=a_republier")}
+            className="mb-3 flex-row items-center rounded-2xl border border-ink bg-white p-4 active:opacity-70"
+          >
+            <Ionicons name="alert-circle-outline" size={22} color={colors.text} />
+            <View className="ml-3 flex-1">
+              <Text className="text-base font-semibold text-ink">
+                {toRelist.length} pièce{toRelist.length > 1 ? "s" : ""} à republier
+              </Text>
+              <Text className="mt-0.5 text-sm text-muted">
+                En ligne depuis plus de 3 semaines sans acheteur
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+
         {/* Bénéfice net = carte héros. */}
         <StatCard
           label="Bénéfice net du mois"

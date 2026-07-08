@@ -14,6 +14,12 @@ export const SACHET_FEE = 0.4;
 export const BUYER_PROTECTION_FEE = 2;
 export const BUYER_SHIPPING_FEE = 3.5;
 
+/**
+ * Nombre de jours après lesquels une pièce toujours "en vente" est
+ * considérée comme à republier (remonter l'annonce augmente sa visibilité).
+ */
+export const RELIST_THRESHOLD_DAYS = 21; // 3 semaines
+
 /** Multiplicateur par défaut : prix de vente conseillé = prix d'achat × 2,2. */
 export const DEFAULT_PRICE_MULTIPLIER = 2.2;
 

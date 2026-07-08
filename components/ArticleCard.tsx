@@ -9,6 +9,7 @@ import { colors } from "../constants/theme";
 import type { Article } from "../types";
 import { marginPercent, netMargin } from "../utils/calculations";
 import { formatEUR, formatPercent } from "../utils/format";
+import { daysSince, needsRelist } from "../utils/stats";
 import { StatusBadge } from "./StatusBadge";
 
 interface ArticleCardProps {
@@ -33,9 +34,18 @@ export function ArticleCard({
   const sellPrice = article.soldPrice ?? article.targetPrice;
   const margin = netMargin(article.purchasePrice, sellPrice);
   const percent = marginPercent(article.purchasePrice, sellPrice);
+  const toRelist = needsRelist(article);
 
   return (
     <View className="my-1 rounded-2xl border border-line bg-white p-3">
+      {toRelist ? (
+        <View className="mb-2 flex-row items-center self-start rounded-full border border-ink px-2.5 py-1">
+          <Ionicons name="alert-circle-outline" size={13} color={colors.text} />
+          <Text className="ml-1 text-xs font-semibold text-ink">
+            En ligne depuis {daysSince(article.createdAt)} j · à republier
+          </Text>
+        </View>
+      ) : null}
       <Pressable
         onPress={onPress}
         className="flex-row items-center active:opacity-70"

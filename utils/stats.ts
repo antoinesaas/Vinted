@@ -2,6 +2,7 @@
 // Agrégation des statistiques (dashboard, historique).
 // ============================================================
 
+import { RELIST_THRESHOLD_DAYS } from "../constants/config";
 import type { Article, MonthlyStats, WeeklyPoint } from "../types";
 import { netMargin } from "./calculations";
 import { formatShortDate } from "./format";
@@ -162,4 +163,27 @@ export function totalLifetimeProfit(articles: Article[]): number {
 /** Total cumulé du chiffre d'affaires depuis le début. */
 export function totalLifetimeRevenue(articles: Article[]): number {
   return soldArticles(articles).reduce((sum, a) => sum + a.soldPrice, 0);
+}
+
+/** Nombre de jours écoulés depuis une date ISO (arrondi à l'inférieur). */
+export function daysSince(iso: string, reference: Date = new Date()): number {
+  const DAY = 24 * 60 * 60 * 1000;
+  return Math.floor((reference.getTime() - new Date(iso).getTime()) / DAY);
+}
+
+/**
+ * Vrai si l'article est en vente depuis plus de `RELIST_THRESHOLD_DAYS`
+ * jours (3 semaines) sans avoir trouvé preneur : à republier pour regagner
+ * en visibilité sur Vinted.
+ */
+export function needsRelist(article: Article, reference: Date = new Date()): boolean {
+  return (
+    article.status === "en_vente" &&
+    daysSince(article.createdAt, reference) >= RELIST_THRESHOLD_DAYS
+  );
+}
+
+/** Articles à republier (en vente depuis plus de 3 semaines). */
+export function articlesToRelist(articles: Article[]): Article[] {
+  return articles.filter((a) => needsRelist(a));
 }

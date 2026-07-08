@@ -35,6 +35,17 @@ export const TYPE_WORDS: Record<ArticleType, string> = {
   autre: "pièce",
 };
 
+/**
+ * Provenance de l'achat : régit si les frais acheteur Vinted (protection +
+ * livraison) s'appliquent automatiquement au prix saisi.
+ */
+export type PurchaseSource = "vinted" | "manuel";
+
+export const PURCHASE_SOURCE_LABELS: Record<PurchaseSource, string> = {
+  vinted: "Achat sur Vinted",
+  manuel: "Achat manuel (hors Vinted)",
+};
+
 /** Article minimal nécessaire pour résoudre le libellé du type. */
 type TypeSource = { type: ArticleType; customType?: string };
 

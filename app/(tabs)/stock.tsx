@@ -1,5 +1,5 @@
 // ÉCRAN 2 — STOCK : liste filtrable des articles, actions explicites.
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 
@@ -15,30 +15,34 @@ import {
 import { useStore } from "../../context/StoreContext";
 import type { Article, ArticleStatus } from "../../types";
 import { confirmAction, promptAmount } from "../../utils/alert";
+import { needsRelist } from "../../utils/stats";
 
-// Options du filtre : "all" + les trois statuts.
-type FilterValue = "all" | ArticleStatus;
+// Options du filtre : "all" + les trois statuts + "à republier".
+type FilterValue = "all" | ArticleStatus | "a_republier";
 
 const FILTERS: SegmentOption<FilterValue>[] = [
   { label: "Tous", value: "all" },
   { label: "En vente", value: "en_vente" },
   { label: "En attente", value: "en_attente" },
   { label: "Vendu", value: "vendu" },
+  { label: "À republier", value: "a_republier" },
 ];
 
 export default function StockScreen() {
   const router = useRouter();
   const { articles, markAsSold, deleteArticle } = useStore();
-  const [filter, setFilter] = useState<FilterValue>("all");
-
-  // Application du filtre de statut.
-  const filtered = useMemo(
-    () =>
-      filter === "all"
-        ? articles
-        : articles.filter((a) => a.status === filter),
-    [articles, filter],
+  // Filtre initial optionnel via l'URL (ex : lien "à republier" du dashboard).
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const [filter, setFilter] = useState<FilterValue>(
+    params.filter === "a_republier" ? "a_republier" : "all",
   );
+
+  // Application du filtre de statut (ou du filtre spécial "à republier").
+  const filtered = useMemo(() => {
+    if (filter === "all") return articles;
+    if (filter === "a_republier") return articles.filter((a) => needsRelist(a));
+    return articles.filter((a) => a.status === filter);
+  }, [articles, filter]);
 
   // Passage en "vendu" : on demande le PRIX DE VENTE FINAL pour que les
   // statistiques (CA, bénéfice, marge) reflètent la réalité.

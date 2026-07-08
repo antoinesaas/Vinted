@@ -28,7 +28,13 @@ import {
   type SegmentOption,
 } from "../../components/SegmentedControl";
 import { BUYER_PROTECTION_FEE, BUYER_SHIPPING_FEE, SACHET_FEE } from "../../constants/config";
-import { CONDITION_LABELS, resolveTypeWord, TYPE_LABELS } from "../../constants/labels";
+import {
+  CONDITION_LABELS,
+  PURCHASE_SOURCE_LABELS,
+  resolveTypeWord,
+  TYPE_LABELS,
+  type PurchaseSource,
+} from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import type { ArticleCondition, ArticleType } from "../../types";
 import {
@@ -59,10 +65,19 @@ const CONDITION_OPTIONS: SegmentOption<ArticleCondition>[] = (
   Object.keys(CONDITION_LABELS) as ArticleCondition[]
 ).map((value) => ({ value, label: CONDITION_LABELS[value] }));
 
+const SOURCE_OPTIONS: SegmentOption<PurchaseSource>[] = (
+  Object.keys(PURCHASE_SOURCE_LABELS) as PurchaseSource[]
+).map((value) => ({ value, label: PURCHASE_SOURCE_LABELS[value] }));
+
 export default function CalculateurScreen() {
   const router = useRouter();
   const [purchaseStr, setPurchaseStr] = useState("");
   const [sellStr, setSellStr] = useState("");
+  // "vinted" : le prix saisi est le prix AFFICHÉ, les frais acheteur
+  // (protection + livraison) sont ajoutés automatiquement.
+  // "manuel" : le prix saisi est le coût réel exact (brocante, don, autre
+  // plateforme…), aucun frais n'est ajouté.
+  const [source, setSource] = useState<PurchaseSource>("vinted");
 
   // Attributs du produit (pré-remplis par la capture, éditables manuellement).
   const [brand, setBrand] = useState("");
@@ -89,12 +104,14 @@ export default function CalculateurScreen() {
   const [searching, setSearching] = useState(false);
   const [resale, setResale] = useState<ResalePriceResult | null>(null);
 
-  // `purchaseStr` est le PRIX AFFICHÉ de l'annonce. Le coût réel payé par
+  // `purchaseStr` est le PRIX AFFICHÉ de l'annonce (mode "vinted") ou le
+  // coût réel exact (mode "manuel"). En mode Vinted, le coût réel payé par
   // l'acheteur inclut en plus la protection acheteur (~2 €) et la
   // livraison (~3,5 €) : c'est ce coût total qui sert de base au calcul
-  // de marge, pas le simple prix affiché.
+  // de marge. En mode manuel, aucun frais n'est ajouté.
   const displayedPrice = parseAmount(purchaseStr);
-  const purchase = totalPurchaseCost(displayedPrice);
+  const purchase =
+    source === "vinted" ? totalPurchaseCost(displayedPrice) : displayedPrice;
   const sell = parseAmount(sellStr);
 
   // Calculs en temps réel (basés sur le coût d'achat réel total).
@@ -105,19 +122,21 @@ export default function CalculateurScreen() {
     return { gross, net, multiplier, level: multiplierLevel(multiplier) };
   }, [purchase, sell]);
 
-  // Fourchette de PRIX AFFICHÉ conseillée (à partir du prix de vente),
-  // affichée quand le deal actuel n'est pas satisfaisant. On retranche les
-  // frais acheteur au coût total cible pour obtenir le prix à viser sur
-  // l'annonce elle-même.
+  // Fourchette de prix d'achat conseillée (à partir du prix de vente),
+  // affichée quand le deal actuel n'est pas satisfaisant. En mode Vinted,
+  // on retranche les frais acheteur au coût total cible pour obtenir le
+  // prix à viser sur l'annonce elle-même ; en mode manuel, le coût total
+  // cible EST le prix à viser (aucun frais à retrancher).
   const purchaseRange = useMemo(() => {
     const totalRange = recommendedPurchaseRange(sell);
-    const toDisplayed = (n: number) => Math.max(0, Math.round((n - BUYER_FEES_TOTAL) * 100) / 100);
+    const fees = source === "vinted" ? BUYER_FEES_TOTAL : 0;
+    const toDisplayed = (n: number) => Math.max(0, Math.round((n - fees) * 100) / 100);
     return {
       low: toDisplayed(totalRange.low),
       high: toDisplayed(totalRange.high),
       max: toDisplayed(totalRange.max),
     };
-  }, [sell]);
+  }, [sell, source]);
 
   const hasInput = displayedPrice > 0 && sell > 0;
 
@@ -224,8 +243,10 @@ export default function CalculateurScreen() {
         size,
         condition,
         // Prix AFFICHÉ (pas le coût total) : l'écran d'ajout calcule lui-même
-        // les frais acheteur, pour éviter de les compter deux fois.
+        // les frais acheteur (si mode Vinted), pour éviter de les compter
+        // deux fois.
         purchasePrice: purchaseStr,
+        purchaseSource: source,
         photoUri: screenshotUri ?? "",
       },
     });
@@ -337,19 +358,31 @@ export default function CalculateurScreen() {
 
             {/* Prix d'achat + recherche du vrai prix de revente */}
             <Card className="mt-3">
+              <Text className="mb-2 text-sm font-medium text-muted">
+                Provenance de l'achat
+              </Text>
+              <SegmentedControl options={SOURCE_OPTIONS} value={source} onChange={setSource} />
+
               <Input
-                label="Prix affiché de l'annonce"
+                className="mt-4"
+                label={source === "vinted" ? "Prix affiché de l'annonce" : "Prix d'achat"}
                 placeholder="0,00"
                 keyboardType="decimal-pad"
                 value={purchaseStr}
                 onChangeText={setPurchaseStr}
                 suffix="€"
               />
-              {displayedPrice > 0 ? (
+              {source === "vinted" && displayedPrice > 0 ? (
                 <Text className="mt-2 text-xs text-muted">
                   {formatEUR(displayedPrice)} + protection ({formatEUR(BUYER_PROTECTION_FEE)}) +
                   livraison ({formatEUR(BUYER_SHIPPING_FEE)}) = coût réel{" "}
                   <Text className="font-semibold text-ink">{formatEUR(purchase)}</Text>
+                </Text>
+              ) : null}
+              {source === "manuel" ? (
+                <Text className="mt-2 text-xs text-muted">
+                  Achat hors Vinted : aucun frais acheteur n'est ajouté, le
+                  prix saisi est utilisé tel quel.
                 </Text>
               ) : null}
 
@@ -424,15 +457,17 @@ export default function CalculateurScreen() {
             <Card className="mt-3">
               <ResultRow label="Prix de vente" value={formatEUR(sell)} className="mb-1.5" />
               <ResultRow
-                label="− Prix affiché (achat)"
+                label={source === "vinted" ? "− Prix affiché (achat)" : "− Prix d'achat"}
                 value={formatEUR(displayedPrice)}
                 className="mb-1.5"
               />
-              <ResultRow
-                label="− Frais acheteur (protection + livraison)"
-                value={formatEUR(BUYER_FEES_TOTAL)}
-                className="mb-1.5"
-              />
+              {source === "vinted" ? (
+                <ResultRow
+                  label="− Frais acheteur (protection + livraison)"
+                  value={formatEUR(BUYER_FEES_TOTAL)}
+                  className="mb-1.5"
+                />
+              ) : null}
               <ResultRow label="− Frais de sachet (envoi)" value={formatEUR(SACHET_FEE)} />
               <View className="my-2 h-px bg-line" />
               <ResultRow label="Marge nette" value={formatEUR(result.net)} strong />
@@ -463,7 +498,9 @@ export default function CalculateurScreen() {
                 <View className="flex-row items-center">
                   <Ionicons name="bulb-outline" size={18} color={colors.text} />
                   <Text className="ml-2 text-sm font-semibold text-ink">
-                    Prix affiché conseillé pour ce prix de vente
+                    {source === "vinted"
+                      ? "Prix affiché conseillé pour ce prix de vente"
+                      : "Prix d'achat conseillé pour ce prix de vente"}
                   </Text>
                 </View>
                 <Text className="mt-2 text-2xl font-bold text-ink">
@@ -471,8 +508,10 @@ export default function CalculateurScreen() {
                 </Text>
                 <Text className="mt-1 text-xs text-muted">
                   Pour un deal cible (x2 à x2,5) sur un prix de vente de{" "}
-                  {formatEUR(sell)}, frais acheteur inclus. À ne pas dépasser :{" "}
-                  {formatEUR(purchaseRange.max)} (minimum acceptable x1,5).
+                  {formatEUR(sell)}
+                  {source === "vinted" ? ", frais acheteur inclus" : ""}. À ne
+                  pas dépasser : {formatEUR(purchaseRange.max)} (minimum
+                  acceptable x1,5).
                 </Text>
               </Card>
             ) : null}
