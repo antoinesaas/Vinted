@@ -16,6 +16,7 @@ import { useStore } from "../../context/StoreContext";
 import type { Article, ArticleStatus } from "../../types";
 import { confirmAction, promptAmount } from "../../utils/alert";
 import { needsRelist } from "../../utils/stats";
+import { useNow } from "../../utils/useNow";
 
 // Options du filtre : "all" + les trois statuts + "à republier".
 type FilterValue = "all" | ArticleStatus | "a_republier";
@@ -36,13 +37,18 @@ export default function StockScreen() {
   const [filter, setFilter] = useState<FilterValue>(
     params.filter === "a_republier" ? "a_republier" : "all",
   );
+  // Date "vivante" (voir dashboard) pour que le filtre/badge "à republier"
+  // ne reste jamais figé si l'app reste ouverte plusieurs jours.
+  const now = useNow();
 
   // Application du filtre de statut (ou du filtre spécial "à republier").
   const filtered = useMemo(() => {
     if (filter === "all") return articles;
-    if (filter === "a_republier") return articles.filter((a) => needsRelist(a));
+    if (filter === "a_republier") {
+      return articles.filter((a) => needsRelist(a, now));
+    }
     return articles.filter((a) => a.status === filter);
-  }, [articles, filter]);
+  }, [articles, filter, now]);
 
   // Passage en "vendu" : on demande le PRIX DE VENTE FINAL pour que les
   // statistiques (CA, bénéfice, marge) reflètent la réalité.
@@ -96,6 +102,7 @@ export default function StockScreen() {
         renderItem={({ item }) => (
           <ArticleCard
             article={item}
+            now={now}
             onPress={() => router.push(`/article/${item.id}`)}
             onMarkSold={() => handleMarkSold(item)}
             onDelete={() => confirmDelete(item)}

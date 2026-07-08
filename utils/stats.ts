@@ -184,6 +184,9 @@ export function needsRelist(article: Article, reference: Date = new Date()): boo
 }
 
 /** Articles à republier (en vente depuis plus de 3 semaines). */
-export function articlesToRelist(articles: Article[]): Article[] {
-  return articles.filter((a) => needsRelist(a));
+export function articlesToRelist(
+  articles: Article[],
+  reference: Date = new Date(),
+): Article[] {
+  return articles.filter((a) => needsRelist(a, reference));
 }

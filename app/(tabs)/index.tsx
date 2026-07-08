@@ -18,10 +18,11 @@ import {
   computeMonthlyStats,
   weeklyProfit,
 } from "../../utils/stats";
+import { useNow } from "../../utils/useNow";
 
-// Nom du mois courant (ex : "Juillet 2026").
-function currentMonthLabel(): string {
-  const label = new Date().toLocaleDateString("fr-FR", {
+// Nom du mois de `date` (ex : "Juillet 2026").
+function monthLabel(date: Date): string {
+  const label = date.toLocaleDateString("fr-FR", {
     month: "long",
     year: "numeric",
   });
@@ -31,15 +32,22 @@ function currentMonthLabel(): string {
 export default function DashboardScreen() {
   const router = useRouter();
   const { articles } = useStore();
+  // Date "vivante", rafraîchie au focus/retour au premier plan/périodiquement
+  // pour que le mois affiché et les stats ne restent jamais figés sur un
+  // mois passé si l'app reste ouverte sans qu'aucun article ne change.
+  const now = useNow();
 
-  // Recalcul mémoïsé à chaque changement d'articles.
-  const stats = useMemo(() => computeMonthlyStats(articles), [articles]);
-  const weekly = useMemo(() => weeklyProfit(articles, 6), [articles]);
-  const toRelist = useMemo(() => articlesToRelist(articles), [articles]);
+  // Recalcul mémoïsé à chaque changement d'articles OU de date de référence.
+  const stats = useMemo(() => computeMonthlyStats(articles, now), [articles, now]);
+  const weekly = useMemo(() => weeklyProfit(articles, 6, now), [articles, now]);
+  const toRelist = useMemo(
+    () => articlesToRelist(articles, now),
+    [articles, now],
+  );
 
   return (
     <Screen>
-      <Header title="Stock.01" subtitle={currentMonthLabel()} />
+      <Header title="Stock.01" subtitle={monthLabel(now)} />
 
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}

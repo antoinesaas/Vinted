@@ -14,6 +14,8 @@ import { StatusBadge } from "./StatusBadge";
 
 interface ArticleCardProps {
   article: Article;
+  /** Date de référence pour "à republier" (par défaut : maintenant). */
+  now?: Date;
   /** Ouvre le détail de l'article. */
   onPress: () => void;
   /** Marque comme vendu. */
@@ -24,6 +26,7 @@ interface ArticleCardProps {
 
 export function ArticleCard({
   article,
+  now,
   onPress,
   onMarkSold,
   onDelete,
@@ -34,7 +37,7 @@ export function ArticleCard({
   const sellPrice = article.soldPrice ?? article.targetPrice;
   const margin = netMargin(article.purchasePrice, sellPrice);
   const percent = marginPercent(article.purchasePrice, sellPrice);
-  const toRelist = needsRelist(article);
+  const toRelist = needsRelist(article, now);
 
   return (
     <View className="my-1 rounded-2xl border border-line bg-white p-3">
@@ -42,7 +45,7 @@ export function ArticleCard({
         <View className="mb-2 flex-row items-center self-start rounded-full border border-ink px-2.5 py-1">
           <Ionicons name="alert-circle-outline" size={13} color={colors.text} />
           <Text className="ml-1 text-xs font-semibold text-ink">
-            En ligne depuis {daysSince(article.createdAt)} j · à republier
+            En ligne depuis {daysSince(article.createdAt, now)} j · à republier
           </Text>
         </View>
       ) : null}
