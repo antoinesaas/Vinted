@@ -3,20 +3,18 @@
 // ============================================================
 
 import {
-  BUYER_PROTECTION_FEE,
-  BUYER_SHIPPING_FEE,
+  BUYER_FEES_TOTAL,
   DEFAULT_PRICE_MULTIPLIER,
   RESALE_MULTIPLIER_THRESHOLDS,
   SACHET_FEE,
 } from "../constants/config";
 
-/** Total des frais acheteur (protection + livraison) ajoutés au prix affiché. */
-export const BUYER_FEES_TOTAL = BUYER_PROTECTION_FEE + BUYER_SHIPPING_FEE;
+export { BUYER_FEES_TOTAL };
 
 /**
  * Coût d'achat réel total = prix affiché de l'annonce + frais acheteur
- * (protection ~2 € + livraison ~3,5 €). C'est ce montant qu'il faut
- * utiliser comme base de calcul de marge, pas le simple prix affiché.
+ * forfaitaires (5 €). C'est ce montant qu'il faut utiliser comme base de
+ * calcul de marge, pas le simple prix affiché.
  */
 export function totalPurchaseCost(displayedPrice: number): number {
   if (displayedPrice <= 0) return 0;

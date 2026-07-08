@@ -21,17 +21,8 @@ import {
   SegmentedControl,
   type SegmentOption,
 } from "../../components/SegmentedControl";
-import {
-  BUYER_PROTECTION_FEE,
-  BUYER_SHIPPING_FEE,
-  SACHET_FEE,
-} from "../../constants/config";
-import {
-  CONDITION_LABELS,
-  PURCHASE_SOURCE_LABELS,
-  TYPE_LABELS,
-  type PurchaseSource,
-} from "../../constants/labels";
+import { SACHET_FEE } from "../../constants/config";
+import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleCondition, ArticleType } from "../../types";
@@ -53,10 +44,6 @@ const CONDITION_OPTIONS: SegmentOption<ArticleCondition>[] = (
   Object.keys(CONDITION_LABELS) as ArticleCondition[]
 ).map((value) => ({ value, label: CONDITION_LABELS[value] }));
 
-const SOURCE_OPTIONS: SegmentOption<PurchaseSource>[] = (
-  Object.keys(PURCHASE_SOURCE_LABELS) as PurchaseSource[]
-).map((value) => ({ value, label: PURCHASE_SOURCE_LABELS[value] }));
-
 export default function AddArticleScreen() {
   const router = useRouter();
   const { addArticle } = useStore();
@@ -72,7 +59,6 @@ export default function AddArticleScreen() {
     size?: string;
     condition?: string;
     purchasePrice?: string;
-    purchaseSource?: string;
     photoUri?: string;
   }>();
 
@@ -86,8 +72,6 @@ export default function AddArticleScreen() {
       ? (params.condition as ArticleCondition)
       : "tres_bon";
   const initialPurchase = params.purchasePrice ?? "";
-  const initialSource: PurchaseSource =
-    params.purchaseSource === "manuel" ? "manuel" : "vinted";
 
   // Vrai si l'écran est ouvert depuis le calculateur (prix pré-rempli).
   const fromCalculator = !!(params.purchasePrice || params.photoUri);
@@ -105,29 +89,23 @@ export default function AddArticleScreen() {
   const [material, setMaterial] = useState(params.material ?? "");
   const [size, setSize] = useState(params.size ?? "");
   const [condition, setCondition] = useState<ArticleCondition>(initialCondition);
-  // "vinted" : le prix saisi est le prix AFFICHÉ, les frais acheteur sont
-  // ajoutés automatiquement. "manuel" : le prix saisi est le coût exact.
-  const [source, setSource] = useState<PurchaseSource>(initialSource);
   const [purchaseStr, setPurchaseStr] = useState(initialPurchase);
   // Prix de vente conseillé pré-calculé si un prix d'achat est fourni
-  // (basé sur le coût réel : prix affiché + frais acheteur en mode Vinted).
+  // (basé sur le coût réel : prix affiché + frais acheteur).
   const [targetStr, setTargetStr] = useState(() => {
-    const raw = parseAmount(initialPurchase);
-    const p = initialSource === "vinted" ? totalPurchaseCost(raw) : raw;
+    const p = totalPurchaseCost(parseAmount(initialPurchase));
     return p > 0 ? recommendedPrice(p).toFixed(2).replace(".", ",") : "";
   });
   // Vrai dès que l'utilisateur modifie manuellement le prix de vente
   // (on cesse alors de le remplir automatiquement).
   const [targetTouched, setTargetTouched] = useState(false);
 
-  // `purchaseStr` est le PRIX AFFICHÉ de l'annonce (mode Vinted) ou le coût
-  // exact déjà payé (mode manuel). En mode Vinted, le coût réel inclut en
-  // plus la protection acheteur (~2 €) et la livraison (~3,5 €) : c'est ce
-  // coût total qui sert de base au calcul de marge et qui est sauvegardé
-  // comme prix d'achat de l'article.
+  // `purchaseStr` est le PRIX AFFICHÉ de l'annonce. Le coût réel inclut en
+  // plus les frais acheteur (protection + livraison, 5 € forfaitaires) :
+  // c'est ce coût total qui sert de base au calcul de marge et qui est
+  // sauvegardé comme prix d'achat de l'article.
   const displayedPrice = parseAmount(purchaseStr);
-  const purchase =
-    source === "vinted" ? totalPurchaseCost(displayedPrice) : displayedPrice;
+  const purchase = totalPurchaseCost(displayedPrice);
   const target = parseAmount(targetStr);
   const margin = netMargin(purchase, target);
 
@@ -137,14 +115,13 @@ export default function AddArticleScreen() {
     if (value !== "autre") setCustomType("");
   };
 
-  // À chaque changement du prix saisi, on propose un prix de vente
+  // À chaque changement du prix affiché, on propose un prix de vente
   // conseillé (× 2,2 sur le coût réel) tant que l'utilisateur n'a rien
   // saisi manuellement.
   const handlePurchaseChange = (value: string) => {
     setPurchaseStr(value);
     if (!targetTouched) {
-      const raw = parseAmount(value);
-      const p = source === "vinted" ? totalPurchaseCost(raw) : raw;
+      const p = totalPurchaseCost(parseAmount(value));
       setTargetStr(p > 0 ? recommendedPrice(p).toFixed(2).replace(".", ",") : "");
     }
   };
@@ -339,14 +316,8 @@ export default function AddArticleScreen() {
 
           {/* Prix */}
           <Card className="mt-5">
-            <Text className="mb-2 text-sm font-medium text-muted">
-              Provenance de l'achat
-            </Text>
-            <SegmentedControl options={SOURCE_OPTIONS} value={source} onChange={setSource} />
-
             <Input
-              className="mt-4"
-              label={source === "vinted" ? "Prix affiché de l'annonce" : "Prix d'achat"}
+              label="Prix affiché de l'annonce"
               placeholder="0,00"
               keyboardType="decimal-pad"
               value={purchaseStr}
@@ -359,16 +330,11 @@ export default function AddArticleScreen() {
                 réellement payé pour des statistiques justes.
               </Text>
             ) : null}
-            {source === "vinted" && displayedPrice > 0 ? (
+            {displayedPrice > 0 ? (
               <Text className="mt-2 text-xs text-muted">
-                {formatEUR(displayedPrice)} + protection ({formatEUR(BUYER_PROTECTION_FEE)}) +
-                livraison ({formatEUR(BUYER_SHIPPING_FEE)}) = coût réel{" "}
+                {formatEUR(displayedPrice)} + frais acheteur ({formatEUR(BUYER_FEES_TOTAL)}) =
+                coût réel{" "}
                 <Text className="font-semibold text-ink">{formatEUR(purchase)}</Text>
-              </Text>
-            ) : null}
-            {source === "manuel" ? (
-              <Text className="mt-2 text-xs text-muted">
-                Achat hors Vinted : aucun frais acheteur n'est ajouté.
               </Text>
             ) : null}
             <Input
@@ -402,15 +368,13 @@ export default function AddArticleScreen() {
               <View className="mt-4 border-t border-line pt-3">
                 <MarginBreakdownRow label="Prix de vente" value={formatEUR(target)} />
                 <MarginBreakdownRow
-                  label={source === "vinted" ? "− Prix affiché (achat)" : "− Prix d'achat"}
+                  label="− Prix affiché (achat)"
                   value={formatEUR(displayedPrice)}
                 />
-                {source === "vinted" ? (
-                  <MarginBreakdownRow
-                    label="− Frais acheteur (protection + livraison)"
-                    value={formatEUR(BUYER_FEES_TOTAL)}
-                  />
-                ) : null}
+                <MarginBreakdownRow
+                  label="− Frais acheteur (protection + livraison)"
+                  value={formatEUR(BUYER_FEES_TOTAL)}
+                />
                 <MarginBreakdownRow
                   label="− Frais de sachet (envoi)"
                   value={formatEUR(SACHET_FEE)}

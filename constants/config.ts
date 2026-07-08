@@ -6,13 +6,12 @@
 export const SACHET_FEE = 0.4;
 
 /**
- * Frais payés par l'ACHETEUR en plus du prix affiché d'une annonce Vinted :
- * protection acheteur (~2 €) + livraison (~3,5 €, fourchette 3-4 €).
- * À ajouter au prix affiché pour obtenir le coût d'achat réel total
- * (utile quand on achète soi-même une pièce sur Vinted pour la revendre).
+ * Frais forfaitaires payés par l'ACHETEUR en plus du prix affiché d'une
+ * annonce Vinted (protection acheteur + livraison). À ajouter au prix
+ * affiché pour obtenir le coût d'achat réel total (utile quand on achète
+ * soi-même une pièce sur Vinted pour la revendre).
  */
-export const BUYER_PROTECTION_FEE = 2;
-export const BUYER_SHIPPING_FEE = 3.5;
+export const BUYER_FEES_TOTAL = 5;
 
 /**
  * Nombre de jours après lesquels une pièce toujours "en vente" est
