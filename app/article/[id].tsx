@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Image, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -101,6 +101,35 @@ export default function ArticleDetailScreen() {
     }
   };
 
+  // Modifie le prix d'achat (correction d'une erreur de saisie, par exemple).
+  const handleEditPurchasePrice = async () => {
+    const price = await promptAmount(
+      "Prix d'achat",
+      "Corrige le prix d'achat de cet article.",
+      article.purchasePrice,
+    );
+    if (price !== null) {
+      updateArticle(article.id, { purchasePrice: price });
+    }
+  };
+
+  // Modifie le prix de vente visé (ou le prix réellement vendu si l'article
+  // est déjà vendu, pour corriger les statistiques).
+  const handleEditSellPrice = async () => {
+    const price = await promptAmount(
+      isSold ? "Prix vendu" : "Prix de vente visé",
+      isSold
+        ? "Corrige le prix auquel cet article a été vendu."
+        : "Modifie le prix de vente visé pour cet article.",
+      sellPrice,
+    );
+    if (price === null) return;
+    updateArticle(
+      article.id,
+      isSold ? { soldPrice: price } : { targetPrice: price },
+    );
+  };
+
   // Génère l'annonce via l'IA (repli automatique sur le modèle local en cas d'échec).
   const handleAi = async () => {
     if (!isAiConfigured()) {
@@ -191,13 +220,18 @@ export default function ArticleDetailScreen() {
           <StatusBadge status={article.status} />
         </View>
 
-        {/* Chiffres clés */}
+        {/* Chiffres clés : les prix sont modifiables (tape pour corriger). */}
         <Card className="mt-4">
-          <DetailRow label="Prix d'achat" value={formatEUR(article.purchasePrice)} />
+          <EditableDetailRow
+            label="Prix d'achat"
+            value={formatEUR(article.purchasePrice)}
+            onEdit={handleEditPurchasePrice}
+          />
           <View className="my-2 h-px bg-line" />
-          <DetailRow
+          <EditableDetailRow
             label={isSold ? "Prix vendu" : "Prix de vente visé"}
             value={formatEUR(sellPrice)}
+            onEdit={handleEditSellPrice}
           />
           <View className="my-2 h-px bg-line" />
           <DetailRow
@@ -330,5 +364,29 @@ function DetailRow({
         {value}
       </Text>
     </View>
+  );
+}
+
+// Ligne "libellé — valeur" modifiable : tape pour corriger le montant.
+function EditableDetailRow({
+  label,
+  value,
+  onEdit,
+}: {
+  label: string;
+  value: string;
+  onEdit: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onEdit}
+      className="flex-row items-center justify-between active:opacity-60"
+    >
+      <Text className="text-base text-muted">{label}</Text>
+      <View className="flex-row items-center">
+        <Text className="mr-1.5 text-base font-semibold text-ink">{value}</Text>
+        <Ionicons name="pencil-outline" size={14} color={colors.textMuted} />
+      </View>
+    </Pressable>
   );
 }
