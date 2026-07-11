@@ -4,6 +4,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Article } from "../types";
+import { notify } from "./alert";
 
 /** Clé de stockage des articles. */
 const ARTICLES_KEY = "@stock01:articles";
@@ -22,12 +23,22 @@ export async function loadArticles(): Promise<Article[]> {
   }
 }
 
-/** Sauvegarde la liste complète des articles dans le stockage local. */
+/**
+ * Sauvegarde la liste complète des articles dans le stockage local.
+ * En cas d'échec (ex : quota de stockage dépassé à cause de photos trop
+ * lourdes), prévient l'utilisateur au lieu d'échouer silencieusement —
+ * sinon les derniers ajouts semblent fonctionner puis disparaissent
+ * mystérieusement au prochain rechargement de la page.
+ */
 export async function saveArticles(articles: Article[]): Promise<void> {
   try {
     await AsyncStorage.setItem(ARTICLES_KEY, JSON.stringify(articles));
   } catch (error) {
     console.warn("[storage] Échec de la sauvegarde des articles :", error);
+    void notify(
+      "Échec de l'enregistrement",
+      "Le stock n'a pas pu être sauvegardé (espace de stockage insuffisant, probablement à cause d'une photo trop lourde). Essaie avec une photo plus légère, ou libère de l'espace.",
+    );
   }
 }
 

@@ -43,6 +43,7 @@ import {
   totalPurchaseCost,
 } from "../../utils/calculations";
 import { formatEUR, parseAmount } from "../../utils/format";
+import { compressImage } from "../../utils/image";
 
 // Options des sélecteurs (dérivées des libellés).
 const TYPE_OPTIONS: SegmentOption<ArticleType>[] = (
@@ -178,7 +179,9 @@ export default function AddArticleScreen() {
     }
   };
 
-  // Sélection d'une photo depuis la galerie.
+  // Sélection d'une photo depuis la galerie (compressée avant stockage :
+  // voir utils/image.ts, indispensable pour ne pas dépasser le quota de
+  // stockage local sur iOS Safari).
   const pickFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -192,11 +195,12 @@ export default function AddArticleScreen() {
       aspect: [1, 1],
     });
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
+      const compressed = await compressImage(result.assets[0].uri);
+      setPhotoUri(compressed.uri);
     }
   };
 
-  // Prise de photo avec l'appareil.
+  // Prise de photo avec l'appareil (compressée avant stockage).
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
@@ -209,7 +213,8 @@ export default function AddArticleScreen() {
       aspect: [1, 1],
     });
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
+      const compressed = await compressImage(result.assets[0].uri);
+      setPhotoUri(compressed.uri);
     }
   };
 

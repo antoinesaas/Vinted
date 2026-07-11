@@ -4,7 +4,6 @@
 // la marge à partir de celui-ci. Cible : deal à x2-x2,5 le prix d'achat,
 // minimum acceptable x1,5.
 import { Ionicons } from "@expo/vector-icons";
-import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -54,6 +53,7 @@ import {
   totalPurchaseCost,
 } from "../../utils/calculations";
 import { formatEUR, parseAmount } from "../../utils/format";
+import { compressImage } from "../../utils/image";
 
 const TYPE_OPTIONS: SegmentOption<ArticleType>[] = (
   Object.keys(TYPE_LABELS) as ArticleType[]
@@ -156,18 +156,15 @@ export default function CalculateurScreen() {
       setAnalyzing(true);
       setDetected(null);
       setResale(null);
-      // Redimensionne (max 1000px) + compresse en JPEG pour un envoi léger.
-      const manip = await ImageManipulator.manipulateAsync(
-        picked.assets[0].uri,
-        [{ resize: { width: 1000 } }],
-        {
-          compress: 0.6,
-          format: ImageManipulator.SaveFormat.JPEG,
-          base64: true,
-        },
-      );
-      setScreenshotUri(manip.uri);
-      const r = await parseScreenshot(manip.base64 ?? "", "image/jpeg");
+      // Redimensionne + compresse avant stockage/envoi (voir utils/image.ts :
+      // indispensable pour ne pas dépasser le quota de stockage local).
+      const compressed = await compressImage(picked.assets[0].uri, {
+        maxWidth: 1000,
+        quality: 0.6,
+        base64: true,
+      });
+      setScreenshotUri(compressed.uri);
+      const r = await parseScreenshot(compressed.base64 ?? "", "image/jpeg");
       setDetected(r);
       setBrand(r.brand);
       setType(r.type);
