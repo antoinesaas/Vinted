@@ -22,10 +22,19 @@ import {
   type SegmentOption,
 } from "../../components/SegmentedControl";
 import { SACHET_FEE } from "../../constants/config";
-import { CONDITION_LABELS, TYPE_LABELS } from "../../constants/labels";
+import {
+  CONDITION_LABELS,
+  resolveTypeWord,
+  TYPE_LABELS,
+} from "../../constants/labels";
 import { colors } from "../../constants/theme";
 import { useStore } from "../../context/StoreContext";
 import type { ArticleCondition, ArticleType } from "../../types";
+import {
+  estimateResalePrice,
+  isAiConfigured,
+  type ResalePriceResult,
+} from "../../utils/ai";
 import { notify } from "../../utils/alert";
 import {
   BUYER_FEES_TOTAL,
@@ -100,6 +109,11 @@ export default function AddArticleScreen() {
   // (on cesse alors de le remplir automatiquement).
   const [targetTouched, setTargetTouched] = useState(false);
 
+  // Recherche du vrai prix de revente (annonces comparables sur Vinted,
+  // avec repli IA), comme dans le calculateur.
+  const [searching, setSearching] = useState(false);
+  const [resale, setResale] = useState<ResalePriceResult | null>(null);
+
   // `purchaseStr` est le PRIX AFFICHÉ de l'annonce. Le coût réel inclut en
   // plus les frais acheteur (protection + livraison, 5 € forfaitaires) :
   // c'est ce coût total qui sert de base au calcul de marge et qui est
@@ -131,6 +145,36 @@ export default function AddArticleScreen() {
     if (purchase > 0) {
       setTargetStr(recommendedPrice(purchase).toFixed(2).replace(".", ","));
       setTargetTouched(true);
+    }
+  };
+
+  // Recherche le vrai prix de revente (annonces comparables réelles sur
+  // Vinted, avec repli IA) et l'utilise comme prix de vente visé.
+  const searchResalePrice = async () => {
+    if (!brand.trim()) {
+      notify("Marque manquante", "Renseigne au moins la marque pour la recherche.");
+      return;
+    }
+    if (!isAiConfigured()) {
+      notify(
+        "Recherche indisponible",
+        "Configure le proxy IA (constants/aiConfig.ts). Voir le README.",
+      );
+      return;
+    }
+    try {
+      setSearching(true);
+      const typeWord = resolveTypeWord({ type, customType });
+      const r = await estimateResalePrice(brand.trim(), typeWord, size.trim(), condition);
+      setResale(r);
+      if (r.averagePrice != null) {
+        setTargetStr(String(r.averagePrice).replace(".", ","));
+        setTargetTouched(true);
+      }
+    } catch (e) {
+      notify("Recherche impossible", (e as Error).message);
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -337,6 +381,62 @@ export default function AddArticleScreen() {
                 <Text className="font-semibold text-ink">{formatEUR(purchase)}</Text>
               </Text>
             ) : null}
+
+            <Button
+              title={searching ? "Recherche…" : "Rechercher le prix de revente réel"}
+              icon="search-outline"
+              variant="secondary"
+              loading={searching}
+              onPress={searchResalePrice}
+              className="mt-4"
+            />
+
+            {resale ? (
+              <View className="mt-3 rounded-xl bg-surface p-3">
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name={resale.source === "vinted_search" ? "checkmark-circle" : "alert-circle"}
+                    size={16}
+                    color={resale.source === "vinted_search" ? colors.text : colors.textMuted}
+                  />
+                  <Text className="ml-2 flex-1 text-sm font-semibold text-ink">
+                    {resale.source === "vinted_search"
+                      ? "Moyenne d'annonces réelles"
+                      : "Estimation IA (repli)"}
+                  </Text>
+                </View>
+
+                <View className="mt-2 flex-row items-center justify-between">
+                  <Text className="text-sm text-muted">
+                    Prix de vente réaliste{"\n"}(ce que tu devrais recevoir)
+                  </Text>
+                  <Text className="text-lg font-bold text-ink">
+                    {formatEUR(resale.averagePrice ?? 0)}
+                  </Text>
+                </View>
+                <View className="mt-2 flex-row items-center justify-between border-t border-line pt-2">
+                  <Text className="text-sm text-muted">
+                    Prix à afficher sur l'annonce{"\n"}(+{formatEUR(5)} marge de négociation)
+                  </Text>
+                  <Text className="text-lg font-bold text-ink">
+                    {formatEUR(resale.listingPrice ?? 0)}
+                  </Text>
+                </View>
+
+                {resale.source === "vinted_search" && resale.lowPrice != null ? (
+                  <Text className="mt-2 border-t border-line pt-2 text-xs text-muted">
+                    Basé sur {resale.sampleSize} annonce(s) comparable(s) · fourchette{" "}
+                    {formatEUR(resale.lowPrice)} – {formatEUR(resale.highPrice ?? 0)}
+                    {"  ·  "}médiane {formatEUR(resale.medianPrice ?? 0)}
+                  </Text>
+                ) : (
+                  <Text className="mt-2 border-t border-line pt-2 text-xs text-muted">
+                    {resale.note}
+                  </Text>
+                )}
+              </View>
+            ) : null}
+
             <Input
               className="mt-4"
               label="Prix de vente visé"

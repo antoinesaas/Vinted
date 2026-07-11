@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { DialogHost } from "../components/DialogHost";
 import { StoreProvider } from "../context/StoreContext";
 
 export default function RootLayout() {
@@ -14,6 +15,8 @@ export default function RootLayout() {
       <StoreProvider>
         {/* Barre d'état sombre (icônes noires) sur fond blanc. */}
         <StatusBar style="dark" />
+        {/* Boîtes de dialogue in-app (alerte/confirmation/saisie). */}
+        <DialogHost />
         <Stack
           screenOptions={{
             headerShown: false,
